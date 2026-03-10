@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Panel MYPE - {{ mype.nombre_comercial }}</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; }
+        .sidebar { width: 250px; background: #343a40; color: white; height: 100vh; padding: 20px; }
+        .main-content { flex: 1; padding: 40px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>{{ mype.nombre_comercial }}</h2>
+        <hr>
+        <p>🏠 <a href="/" style="color:white; text-decoration:none;">Ver mi tienda en mapa</a></p>
+        <p>📦 Mis Productos</p>
+        <p>💬 Mensajes</p>
+        <p>⚙️ Configuración</p>
+        <br>
+        <a href="/logout" style="color:#ff6b6b;">Cerrar Sesión</a>
+    </div>
+
+    <div class="main-content">
+        <h1>Gestión de Productos</h1>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}{% for m in messages %}<p style="color: green;">{{ m }}</p>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h3>🚀 Subir Nuevo Producto / Oferta</h3>
+            <form action="/agregar_producto" method="POST">
+                <div class="form-group">
+                    <input type="text" name="nombre" placeholder="Nombre del producto" required>
+                </div>
+                <div class="form-group">
+                    <textarea name="descripcion" placeholder="Describe tu oferta..."></textarea>
+                </div>
+                <div class="form-group">
+                    <input type="number" step="0.01" name="precio" placeholder="Precio (S/)" required>
+                </div>
+                <button type="submit">Publicar Producto</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>📦 Tus Productos Activos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Fecha</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in productos %}
+                    <tr>
+                        <td><strong>{{ p.nombre }}</strong></td>
+                        <td>S/{{ p.precio }}</td>
+                        <td>{{ p.fecha_creacion[:10] }}</td>
+                        <td><a href="#" style="color:red;">Eliminar</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

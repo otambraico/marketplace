@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Panel de Control - Admin{% endblock %}
+
+{% block content %}
+    <div class="container pb-5">
+    <h2 class="mb-4">🛡️ Panel de Administración</h2>
+
+    <div class="row mb-5">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">Negocios (MYPES)</h6>
+                    <h2 class="display-4 fw-bold">{{ mypes }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">Clientes Activos</h6>
+                    <h2 class="display-4 fw-bold">{{ clientes }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark text-white shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6 class="text-uppercase opacity-75">Ofertas Publicadas</h6>
+                    <h2 class="display-4 fw-bold">{{ productos }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 p-3 mb-4">
+                <h5 class="mb-3">👥 Gestión de Usuarios</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in usuarios %}
+                            <tr>
+                                <td>{{ user.nombre }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ user.rol }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger">Suspender</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 p-3">
+                <h5 class="mb-3">🏷️ Categorías</h5>
+                <form action="/admin/agregar_categoria" method="POST" class="mb-3 d-flex gap-2">
+                    <input type="text" name="nombre_cat" class="form-control form-control-sm" placeholder="Nueva categoría..." required>
+                    <button type="submit" class="btn btn-primary btn-sm">Añadir</button>
+                </form>
+                <ul class="list-group list-group-flush">
+                    {% for cat in categorias %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ cat.nombre }}
+                        <a href="#" class="text-danger"><small>Eliminar</small></a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

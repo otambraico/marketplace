@@ -65,6 +65,20 @@ def init_db():
         ('Barrio Comercial',)
         ]
     cursor.executemany('INSERT OR IGNORE INTO maestro_barrios (nombre) VALUES (?)', barrios)
+
+    # Agrega esto a tu función init_db() en database.py
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS productos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mype_id INTEGER,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            precio REAL NOT NULL,
+            foto_url TEXT,
+            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (mype_id) REFERENCES perfiles_mype(id)
+        )
+    ''')
     
     conn.commit()
     conn.close()

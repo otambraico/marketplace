@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Barrio Marketplace</title>
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        form { background: #eee; padding: 20px; border-radius: 5px; max-width: 300px; }
+        input { display: block; margin-bottom: 10px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <h1>Crear Cuenta</h1>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div id="flash-container" style="margin-bottom: 20px; max-width: 340px;">
+                    {% for message in messages %}
+                        <div style="background-color: #d4edda; color: #155724; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin-bottom: 10px;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+    <form method="POST" action="/registro">
+        <input type="text" name="nombre" placeholder="Nombre completo" required>
+        <input type="email" name="email" placeholder="Email" required>
+        <input type="password" name="password" placeholder="Contraseña" required>
+        
+        <label>¿Qué tipo de usuario eres?</label>
+        <select name="rol" id="rol_selector" onchange="mostrarCamposMype()">
+            <option value="cliente">Soy Comprador (Cliente)</option>
+            <option value="mype">Soy un Negocio (MYPE)</option>
+        </select>
+
+        <div id="campos_mype" style="display:none;">
+             <input type="text" name="nombre_comercial" placeholder="Nombre del Negocio">
+             <label>Categoría:</label>
+             <select name="categoria_id">
+                {% for cat in categorias %}
+                <option value="{{ cat[0] }}">{{ cat[1] }}</option>
+                {% endfor %}
+             </select>
+             <label>Barrio:</label>
+             <select name="barrio_id">
+                {% for b in barrios %}
+                <option value="{{ b[0] }}">{{ b[1] }}</option>
+                {% endfor %}
+             </select>
+        </div>
+
+        <input type="hidden" name="latitud" id="lat">
+        <input type="hidden" name="longitud" id="lng">
+
+        <button type="submit" id="btn_registro" style="margin-top: 10px;">Crear Cuenta</button>
+    </form>
+    
+    <script>
+        function mostrarCamposMype() {
+        const rol = document.getElementById('rol_selector').value;
+        const camposMype = document.getElementById('campos_mype');
+        const inputsMype = camposMype.querySelectorAll('input, select');        
+        if (rol === 'mype') {
+        camposMype.style.display = 'block';
+        inputsMype.forEach(input => input.setAttribute('required', ''));
+        } else {
+        camposMype.style.display = 'none';
+        inputsMype.forEach(input => input.removeAttribute('required'));
+        }
+        }
+
+        // Captura de ubicación automática al cargar la página
+        window.onload = function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                document.getElementById('lat').value = position.coords.latitude;
+                document.getElementById('lng').value = position.coords.longitude;
+                console.log("Ubicación capturada correctamente");
+            }, function(error) {
+                alert("Para un mejor servicio vecinal, por favor permite el acceso a tu ubicación.");
+            });
+        }
+        };
+    </script>
+</body>
+</html>
