@@ -21,35 +21,43 @@ app.secret_key = 'tu_clave_secreta_para_flash' # Obligatorio para usar flash()
 def login():
     if request.method == 'POST':
         email = request.form['email']
-        password_candidata = request.form['password']
-        
+        password = request.form['password']
+                
         conn = sqlite3.connect('marketplace.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         # Buscamos al usuario por email
         cursor.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
-        usuario = cursor.fetchone()
+        user = cursor.fetchone()
         conn.close()
         
-        if usuario and check_password_hash(usuario['password'], password_candidata):
-            # Guardamos datos clave en la sesión
-            session['user_id'] = usuario['id']
-            session['user_nombre'] = usuario['nombre']
-            session['user_rol'] = usuario['rol']
+        # 1. Validamos si el usuario existe
+        if user:
+            # 2. Validamos la contraseña
+            if check_password_hash(user['password'], password):
+
+                if user['estado'] != 'activo':
+                   flash("⚠️ Tu cuenta está suspendida. Contacta al administrador.")
+                   return redirect('/login')
+                     
+                # Guardamos datos clave en la sesión
+                session['user_id'] = user['id']
+                session['user_nombre'] = user['nombre']
+                session['user_rol'] = user['rol']
             
-            flash(f"¡Bienvenido de nuevo, {usuario['nombre']}!")
+                flash(f"¡Bienvenido de nuevo, {user['nombre']}!")
             
-            # Redirección según el ROL (UX diferenciada)
-            if usuario['rol'] == 'mype':
-                return redirect('/dashboard_mype')
-            elif usuario['rol'] == 'admin':
-                return redirect('/admin')
-            else:
+                # Redirección según el ROL (UX diferenciada)
+                if user['rol'] == 'admin':
+                    return redirect('/admin')
+                elif user['rol'] == 'mype':
+                    return redirect('/dashboard_mype')
                 return redirect('/') # El cliente vuelve al mapa
+            else:
+                flash("❌ Contraseña incorrecta.", "warning")
         else:
-            flash("Correo o contraseña incorrectos")
-            return redirect('/login')
+            flash("❌ El correo electrónico no está registrado.", "danger")
             
     return render_template('login.html')
 
@@ -62,6 +70,7 @@ def logout():
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     conn = sqlite3.connect('marketplace.db')
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     if request.method == 'GET':
@@ -99,8 +108,8 @@ def registro():
                     INSERT INTO perfiles_mype (usuario_id, nombre_comercial, barrio_id, categoria_id) 
                     VALUES (?, ?, ?, ?)''', (usuario_id, nombre_comercial, barrio_id, categoria_id))
             
-            conn.commit()
-            flash("Registro exitoso. ¡Bienvenido al Marketplace vecinal!")
+                conn.commit()
+                flash("Registro exitoso. ¡Bienvenido al Marketplace vecinal!")
             return redirect('/registro') # El redirect es clave para limpiar el formulario
         except Exception as e:
             conn.rollback()
@@ -214,29 +223,6 @@ def agregar_producto():
     flash("✅ Producto publicado con éxito")
     return redirect('/dashboard_mype')
 
-# Ruta en app.py para el Admin
-@app.route('/admin')
-@login_required
-def admin_panel():
-    if session.get('user_rol') != 'admin':
-        return redirect('/')
-    
-    conn = sqlite3.connect('marketplace.db')
-    cursor = conn.cursor()
-    
-    # Estadísticas rápidas
-    cursor.execute("SELECT count(*) FROM usuarios WHERE rol='mype'")
-    total_mypes = cursor.fetchone()[0]
-    cursor.execute("SELECT count(*) FROM usuarios WHERE rol='cliente'")
-    total_clientes = cursor.fetchone()[0]
-    
-    # Listado de categorías para gestión
-    cursor.execute("SELECT * FROM maestro_categorias")
-    categorias = cursor.fetchall()
-    
-    conn.close()
-    return render_template('admin.html', mypes=total_mypes, clientes=total_clientes, categorias=categorias)
-
 #Lógica del Admin
 @app.route('/admin')
 @login_required
@@ -262,7 +248,7 @@ def admin_panel():
 
     # --- LISTADOS ---
     # Usuarios registrados
-    cursor.execute("SELECT id, nombre, email, rol, fecha_registro FROM usuarios ORDER BY fecha_registro DESC")
+    cursor.execute("SELECT id, nombre, email, rol, estado FROM usuarios")
     usuarios = cursor.fetchall()
     
     # Categorías actuales
@@ -275,7 +261,49 @@ def admin_panel():
                            clientes=total_clientes, 
                            productos=total_productos,
                            usuarios=usuarios,
-                           categorias=categorias)
+                           categorias=categorias
+                           )
+
+@app.route('/admin/agregar_categoria', methods=['POST'])
+@login_required
+def agregar_categoria():
+    if session.get('user_rol') == 'admin':
+        nombre = request.form['nombre_cat']
+        conn = sqlite3.connect('marketplace.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (?)", (nombre,))
+        conn.commit()
+        conn.close()
+        flash("Categoría añadida con éxito")
+    return redirect('/admin')
+
+# Nueva ruta para eliminar categorías
+@app.route('/admin/eliminar_categoria/<int:id>')
+@login_required
+def eliminar_categoria(id):
+    if session.get('user_rol') == 'admin':
+        conn = sqlite3.connect('marketplace.db')
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM maestro_categorias WHERE id = ?", (id,))
+        conn.commit()
+        conn.close()
+        flash("Categoría eliminada.")
+    return redirect('/admin')
+
+@app.route('/admin/cambiar_estado/<int:usuario_id>/<nuevo_estado>')
+@login_required
+def cambiar_estado(usuario_id, nuevo_estado):
+    if session.get('user_rol') != 'admin':
+        return redirect('/')
+    
+    conn = sqlite3.connect('marketplace.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET estado = ? WHERE id = ?", (nuevo_estado, usuario_id))
+    conn.commit()
+    conn.close()
+    
+    flash(f"Usuario actualizado a: {nuevo_estado}")
+    return redirect('/admin')
 
 if __name__ == '__main__':
     app.run(debug=True)

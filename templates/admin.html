@@ -45,22 +45,36 @@
                                 <th>Email</th>
                                 <th>Rol</th>
                                 <th>Acción</th>
+                                <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for user in usuarios %}
-                            <tr>
-                                <td>{{ user.nombre }}</td>
-                                <td>{{ user.email }}</td>
-                                <td>
-                                    <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                        {{ user.rol }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-danger">Suspender</button>
-                                </td>
-                            </tr>
+                                <tr>
+                                    <td>{{ user.nombre }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ user.rol }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if user.id != session['user_id'] %} {% if user.estado == 'activo' %}
+                                                <a href="/admin/cambiar_estado/{{ user.id }}/suspendido" class="btn btn-sm btn-outline-danger">Suspender</a>
+                                            {% else %}
+                                                <a href="/admin/cambiar_estado/{{ user.id }}/activo" class="btn btn-sm btn-outline-success">Activar</a>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.estado == 'activo' %}
+                                            <span class="text-success">●</span> Activo
+                                        {% else %}
+                                            <span class="text-danger">●</span> Suspendido
+                                        {% endif %}
+                                    </td>
+                                    
+                                </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -79,7 +93,11 @@
                     {% for cat in categorias %}
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         {{ cat.nombre }}
-                        <a href="#" class="text-danger"><small>Eliminar</small></a>
+                        <a href="/admin/eliminar_categoria/{{ cat.id }}" 
+                        class="text-danger" 
+                        onclick="return confirm('¿Eliminar esta categoría?')">
+                        <small>Eliminar</small>
+                        </a>
                     </li>
                     {% endfor %}
                 </ul>

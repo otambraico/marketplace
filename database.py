@@ -79,6 +79,9 @@ def init_db():
             FOREIGN KEY (mype_id) REFERENCES perfiles_mype(id)
         )
     ''')
+
+    # Ejecuta esto en tu script de base de datos o consola de SQL
+    cursor.execute("ALTER TABLE usuarios ADD COLUMN estado TEXT DEFAULT 'activo'")
     
     conn.commit()
     conn.close()

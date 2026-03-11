@@ -1,88 +1,96 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <title>Barrio Marketplace</title>
-    <style>
-        body { font-family: Arial; margin: 40px; }
-        form { background: #eee; padding: 20px; border-radius: 5px; max-width: 300px; }
-        input { display: block; margin-bottom: 10px; width: 100%; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
 
-    <h1>Crear Cuenta</h1>
+{% block title %}Únete a Barrio Market{% endblock %}
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div id="flash-container" style="margin-bottom: 20px; max-width: 340px;">
-                    {% for message in messages %}
-                        <div style="background-color: #d4edda; color: #155724; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin-bottom: 10px;">
-                            {{ message }}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold text-primary">Crea tu cuenta</h2>
+                        <p class="text-muted">Conéctate con tu comunidad hoy mismo.</p>
+                    </div>
+
+                    <form action="/registro" method="POST">
+                        <div class="mb-4 text-center">
+                            <label class="form-label d-block fw-bold mb-3">¿Qué perfil buscas?</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="rol" id="rol_cliente" value="cliente" checked autocomplete="off">
+                                <label class="btn btn-outline-primary py-3" for="rol_cliente">
+                                    🙋‍♂️ Soy Vecino
+                                </label>
+
+                                <input type="radio" class="btn-check" name="rol" id="rol_mype" value="mype" autocomplete="off">
+                                <label class="btn btn-outline-primary py-3" for="rol_mype">
+                                    🏪 Soy Negocio
+                                </label>
+                            </div>
                         </div>
-                    {% endfor %}
+
+                        <div class="form-floating mb-3">
+                            <input type="text" name="nombre" class="form-control" id="f_nombre" placeholder="Nombre" required>
+                            <label for="f_nombre">Nombre Completo</label>
+                        </div>
+
+                        <div class="form-floating mb-3">
+                            <input type="email" name="email" class="form-control" id="f_email" placeholder="name@example.com" required>
+                            <label for="f_email">Correo Electrónico</label>
+                        </div>
+
+                        <div id="seccion_mype" style="display: none;" class="bg-light p-3 rounded-3 mb-3 border">
+                            <p class="small fw-bold text-uppercase text-secondary">Datos de tu Negocio</p>
+                            <div class="form-floating mb-3">
+                                <input type="text" name="nombre_comercial" class="form-control" id="f_comercial" placeholder="Nombre del local">
+                                <label for="f_comercial">Nombre del Negocio</label>
+                            </div>
+                            <div class="mb-2">
+                                <label class="small text-muted mb-1">Categoría</label>
+                                <select name="categoria_id" class="form-select">
+                                    {% for cat in categorias %}
+                                        <option value="{{ cat.id }}">{{ cat.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-floating mb-4">
+                            <input type="password" name="password" class="form-control" id="f_pass" placeholder="Password" required>
+                            <label for="f_pass">Contraseña</label>
+                            <div class="form-text">Mínimo 8 caracteres.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-3 rounded-3 fw-bold shadow-sm">
+                            Completar Registro
+                        </button>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <span class="text-muted small">¿Ya tienes cuenta?</span> 
+                        <a href="/login" class="text-decoration-none fw-bold ms-1">Inicia sesión aquí</a>
+                    </div>
                 </div>
-            {% endif %}
-        {% endwith %}
-
-    <form method="POST" action="/registro">
-        <input type="text" name="nombre" placeholder="Nombre completo" required>
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Contraseña" required>
-        
-        <label>¿Qué tipo de usuario eres?</label>
-        <select name="rol" id="rol_selector" onchange="mostrarCamposMype()">
-            <option value="cliente">Soy Comprador (Cliente)</option>
-            <option value="mype">Soy un Negocio (MYPE)</option>
-        </select>
-
-        <div id="campos_mype" style="display:none;">
-             <input type="text" name="nombre_comercial" placeholder="Nombre del Negocio">
-             <label>Categoría:</label>
-             <select name="categoria_id">
-                {% for cat in categorias %}
-                <option value="{{ cat[0] }}">{{ cat[1] }}</option>
-                {% endfor %}
-             </select>
-             <label>Barrio:</label>
-             <select name="barrio_id">
-                {% for b in barrios %}
-                <option value="{{ b[0] }}">{{ b[1] }}</option>
-                {% endfor %}
-             </select>
+            </div>
         </div>
+    </div>
+</div>
 
-        <input type="hidden" name="latitud" id="lat">
-        <input type="hidden" name="longitud" id="lng">
+<script>
+    // Lógica para mostrar/ocultar campos de MYPE
+    const radioMype = document.getElementById('rol_mype');
+    const radioCliente = document.getElementById('rol_cliente');
+    const seccionMype = document.getElementById('seccion_mype');
 
-        <button type="submit" id="btn_registro" style="margin-top: 10px;">Crear Cuenta</button>
-    </form>
-    
-    <script>
-        function mostrarCamposMype() {
-        const rol = document.getElementById('rol_selector').value;
-        const camposMype = document.getElementById('campos_mype');
-        const inputsMype = camposMype.querySelectorAll('input, select');        
-        if (rol === 'mype') {
-        camposMype.style.display = 'block';
-        inputsMype.forEach(input => input.setAttribute('required', ''));
+    function toggleMype() {
+        if (radioMype.checked) {
+            seccionMype.style.display = 'block';
         } else {
-        camposMype.style.display = 'none';
-        inputsMype.forEach(input => input.removeAttribute('required'));
+            seccionMype.style.display = 'none';
         }
-        }
+    }
 
-        // Captura de ubicación automática al cargar la página
-        window.onload = function() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                document.getElementById('lat').value = position.coords.latitude;
-                document.getElementById('lng').value = position.coords.longitude;
-                console.log("Ubicación capturada correctamente");
-            }, function(error) {
-                alert("Para un mejor servicio vecinal, por favor permite el acceso a tu ubicación.");
-            });
-        }
-        };
-    </script>
-</body>
-</html>
+    radioMype.addEventListener('change', toggleMype);
+    radioCliente.addEventListener('change', toggleMype);
+</script>
+{% endblock %}
