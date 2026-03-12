@@ -4,6 +4,9 @@ def init_db():
     conn = sqlite3.connect('marketplace.db')
     cursor = conn.cursor()
     
+    # Activar el soporte para llaves foráneas en SQLite
+    cursor.execute('PRAGMA foreign_keys = ON')
+
     # 1. TABLA MAESTRA: Categorías
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS maestro_categorias (
@@ -20,7 +23,9 @@ def init_db():
         )
     ''')
 
-    # 3. TABLA: Usuarios (sin cambios)
+    # 3. TABLA: Usuarios 
+    # NOTA: He incluido 'barrio_id' aquí para que Clientes y Mypes lo tengan por igual
+    # También incluimos 'estado' y 'fecha_registro' desde el inicio
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,11 +33,16 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             rol TEXT CHECK(rol IN ('mype', 'cliente', 'admin')) DEFAULT 'cliente',
-            latitud REAL, longitud REAL
+            barrio_id INTEGER,
+            estado TEXT DEFAULT 'activo',
+            latitud REAL, 
+            longitud REAL,
+            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (barrio_id) REFERENCES maestro_barrios(id)
         )
     ''')
 
-    # 4. TABLA: Perfil MYPE (Ahora usa llaves foráneas a los maestros)
+    # 4. TABLA: Perfil MYPE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS perfiles_mype (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,33 +50,12 @@ def init_db():
             nombre_comercial TEXT,
             descripcion TEXT,
             categoria_id INTEGER,
-            barrio_id INTEGER,
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-            FOREIGN KEY (categoria_id) REFERENCES maestro_categorias(id),
-            FOREIGN KEY (barrio_id) REFERENCES maestro_barrios(id)
+            FOREIGN KEY (categoria_id) REFERENCES maestro_categorias(id)
         )
     ''')
 
-    # --- PRECARGA DE DATOS ESTÁNDAR ---
-    categorias = [
-        ('Alimentos',),
-        ('Ropa y Calzado',),
-        ('Servicios Técnicos',),
-        ('Hogar',),
-        ('Salud',)
-        ]
-    cursor.executemany('INSERT OR IGNORE INTO maestro_categorias (nombre) VALUES (?)', categorias)
-
-    barrios = [
-        ('Sector Norte',),
-        ('Sector Sur',),
-        ('Centro Histórico',),
-        ('Zona Residencial',),
-        ('Barrio Comercial',)
-        ]
-    cursor.executemany('INSERT OR IGNORE INTO maestro_barrios (nombre) VALUES (?)', barrios)
-
-    # Agrega esto a tu función init_db() en database.py
+    # 5. TABLA: Productos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS productos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,10 +69,16 @@ def init_db():
         )
     ''')
 
-    # Ejecuta esto en tu script de base de datos o consola de SQL
-    cursor.execute("ALTER TABLE usuarios ADD COLUMN estado TEXT DEFAULT 'activo'")
+    # --- PRECARGA DE DATOS ---
+    categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
+    cursor.executemany('INSERT OR IGNORE INTO maestro_categorias (nombre) VALUES (?)', categorias)
+
+    barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',), ('Zona Residencial',), ('Barrio Comercial',)]
+    cursor.executemany('INSERT OR IGNORE INTO maestro_barrios (nombre) VALUES (?)', barrios)
     
     conn.commit()
     conn.close()
+    print("✅ Base de datos 'marketplace.db' creada y poblada con éxito.")
 
-init_db()
+if __name__ == "__main__":
+    init_db()

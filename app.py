@@ -73,59 +73,58 @@ def registro():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    if request.method == 'GET':
-        cursor.execute("SELECT * FROM maestro_categorias")
-        cats = cursor.fetchall()
-        cursor.execute("SELECT * FROM maestro_barrios")
-        brs = cursor.fetchall()
-        conn.close()
-        return render_template('registro.html', categorias=cats, barrios=brs)
-
     if request.method == 'POST':
-        # Datos básicos
+        # 1. Captura de datos
         nombre = request.form['nombre']
         email = request.form['email']
         password = generate_password_hash(request.form['password'])
         rol = request.form['rol']
-        lat = request.form.get('latitud') # Usamos .get por seguridad
+        barrio_id = request.form.get('barrio_id')
+        lat = request.form.get('latitud')
         lng = request.form.get('longitud')
         
         try:
-            # 1. Insertar en tabla usuarios
+            # 2. Insertar en tabla usuarios (Siempre se ejecuta)
+            # NOTA: Asegúrate que 'estado' en DB acepte 'Activo' o cámbialo a 'activo' (minúsculas) según tu lógica de login
             cursor.execute('''
-                INSERT INTO usuarios (nombre, email, password, rol, latitud, longitud) 
-                VALUES (?, ?, ?, ?, ?, ?)''', (nombre, email, password, rol, lat, lng))
+                INSERT INTO usuarios (nombre, email, password, rol, barrio_id, estado, latitud, longitud) 
+                VALUES (?, ?, ?, ?, ?, 'activo', ?, ?)
+            ''', (nombre, email, password, rol, barrio_id, lat, lng))
             
-            # 2. Si es MYPE, crear su perfil comercial usando IDs de tablas maestras
+            usuario_id = cursor.lastrowid
+
+            # 3. Si es MYPE, crear su perfil comercial
             if rol == 'mype':
-                usuario_id = cursor.lastrowid
-                nombre_comercial = request.form['nombre_comercial']
-                # Cambiamos 'barrio' por 'barrio_id' y capturamos 'categoria_id'
-                barrio_id = request.form['barrio_id']
-                categoria_id = request.form['categoria_id']
+                nombre_comercial = request.form.get('nombre_comercial')
+                categoria_id = request.form.get('categoria_id')
                 
+                # Eliminamos lat/lng de aquí porque ya se guardaron en la tabla 'usuarios'
                 cursor.execute('''
-                    INSERT INTO perfiles_mype (usuario_id, nombre_comercial, barrio_id, categoria_id) 
-                    VALUES (?, ?, ?, ?)''', (usuario_id, nombre_comercial, barrio_id, categoria_id))
+                    INSERT INTO perfiles_mype (usuario_id, nombre_comercial, categoria_id) 
+                    VALUES (?, ?, ?)
+                ''', (usuario_id, nombre_comercial, categoria_id))
             
-                conn.commit()
-                flash("Registro exitoso. ¡Bienvenido al Marketplace vecinal!")
-            return redirect('/registro') # El redirect es clave para limpiar el formulario
+            # 4. COMMIT FUERA DEL IF (Vital para que guarde tanto clientes como mypes)
+            conn.commit()
+            flash("Registro exitoso. ¡Bienvenido al Marketplace!", "success")
+            return redirect('/login')
+
         except Exception as e:
             conn.rollback()
-            flash(f"Error: {e}")
+            print(f"Error detectado: {e}") # Esto te ayudará a ver el error real en la terminal
+            flash(f"Error: Datos incompletos o el correo ya existe.", "danger")
             return redirect('/registro')
         finally:
             conn.close()
 
-    # Si llegamos aquí, es un GET (carga inicial o después del redirect)
-    cursor.execute("SELECT * FROM maestro_categorias")
-    cats = cursor.fetchall()
+    # Lógica GET
     cursor.execute("SELECT * FROM maestro_barrios")
-    brs = cursor.fetchall()
+    barrios = cursor.fetchall()
+    cursor.execute("SELECT * FROM maestro_categorias")
+    categorias = cursor.fetchall()
     conn.close()
     
-    return render_template('registro.html', categorias=cats, barrios=brs)
+    return render_template('registro.html', barrios=barrios, categorias=categorias)
 
 # Agregamos una ruta básica para evitar errores si vas a /
 @app.route('/')
@@ -228,14 +227,31 @@ def agregar_producto():
 @login_required
 def admin_panel():
     # Seguridad: Solo el admin entra aquí
-    if session.get('user_rol') != 'admin':
-        flash("Acceso restringido.")
+    if session.get('user_rol') != 'admin': 
         return redirect('/')
-    
+    # flash("Acceso restringido.")
+            
     conn = sqlite3.connect('marketplace.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 1. Usuarios con su barrio (JOIN para la tabla principal de usuarios)
+    cursor.execute('''
+        SELECT u.id, u.nombre, u.email, u.rol, u.estado, u.fecha_registro, b.nombre as nombre_barrio
+        FROM usuarios u
+        LEFT JOIN maestro_barrios b ON u.barrio_id = b.id
+    ''')
+    usuarios = cursor.fetchall()
+
+    # En la función admin_panel de app.py
+    cursor.execute('''
+        SELECT b.id, b.nombre, COUNT(u.id) as total_usuarios
+        FROM maestro_barrios b
+        LEFT JOIN usuarios u ON b.id = u.barrio_id
+        GROUP BY b.id
+    ''')
+    barrios = cursor.fetchall()
+
     # --- INDICADORES (KPIs) ---
     cursor.execute("SELECT count(*) as total FROM usuarios WHERE rol='mype'")
     total_mypes = cursor.fetchone()['total']
@@ -248,27 +264,28 @@ def admin_panel():
 
     # --- LISTADOS ---
     # Usuarios registrados
-    cursor.execute("SELECT id, nombre, email, rol, estado FROM usuarios")
-    usuarios = cursor.fetchall()
+    # cursor.execute("SELECT id, nombre, email, rol, estado FROM usuarios")
+    # usuarios = cursor.fetchall()
     
     # Categorías actuales
     cursor.execute("SELECT * FROM maestro_categorias")
     categorias = cursor.fetchall()
-    
+     
     conn.close()
     return render_template('admin.html', 
                            mypes=total_mypes, 
                            clientes=total_clientes, 
                            productos=total_productos,
                            usuarios=usuarios,
-                           categorias=categorias
+                           categorias=categorias,
+                           barrios=barrios
                            )
 
 @app.route('/admin/agregar_categoria', methods=['POST'])
 @login_required
 def agregar_categoria():
     if session.get('user_rol') == 'admin':
-        nombre = request.form['nombre_cat']
+        nombre = request.form['nombre_categoria']
         conn = sqlite3.connect('marketplace.db')
         cursor = conn.cursor()
         cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (?)", (nombre,))
@@ -303,6 +320,49 @@ def cambiar_estado(usuario_id, nuevo_estado):
     conn.close()
     
     flash(f"Usuario actualizado a: {nuevo_estado}")
+    return redirect('/admin')
+
+# --- GESTIÓN DE BARRIOS EN ADMIN ---
+
+@app.route('/admin/agregar_barrio', methods=['POST'])
+@login_required
+def agregar_barrio():
+    if session.get('user_rol') == 'admin':
+        nombre = request.form.get('nombre_barrio')
+        if nombre:
+            conn = sqlite3.connect('marketplace.db')
+            cursor = conn.cursor()
+            try:
+                cursor.execute("INSERT INTO maestro_barrios (nombre) VALUES (?)", (nombre,))
+                conn.commit()
+                flash(f"Barrio '{nombre}' agregado correctamente.", "success")
+            except sqlite3.IntegrityError:
+                flash("Ese barrio ya existe.", "warning")
+            finally:
+                conn.close()
+    return redirect('/admin')
+
+@app.route('/admin/eliminar_barrio/<int:id>')
+@login_required
+def eliminar_barrio(id):
+    if session.get('user_rol') == 'admin':
+        conn = sqlite3.connect('marketplace.db')
+        cursor = conn.cursor()
+        try:
+            # Verificamos si hay usuarios en este barrio antes de borrar
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE barrio_id = ?", (id,))
+            count = cursor.fetchone()[0]
+            
+            if count > 0:
+                flash(f"No se puede eliminar: hay {count} usuarios registrados en este barrio.", "danger")
+            else:
+                cursor.execute("DELETE FROM maestro_barrios WHERE id = ?", (id,))
+                conn.commit()
+                flash("Barrio eliminado con éxito.", "success")
+        except Exception as e:
+            flash(f"Error al eliminar: {e}", "danger")
+        finally:
+            conn.close()
     return redirect('/admin')
 
 if __name__ == '__main__':

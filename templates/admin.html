@@ -3,6 +3,18 @@
 {% block title %}Panel de Control - Admin{% endblock %}
 
 {% block content %}
+    <div class="container mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>  
     <div class="container pb-5">
     <h2 class="mb-4">🛡️ Panel de Administración</h2>
 
@@ -36,71 +48,154 @@
     <div class="row">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 p-3 mb-4">
-                <h5 class="mb-3">👥 Gestión de Usuarios</h5>
-                <div class="table-responsive">
+                <h5 class="mb-3 text-center text-lg-start">👥 Gestión de Usuarios</h5>
+
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Nombre</th>
-                                <th>Email</th>
-                                <th>Rol</th>
-                                <th>Acción</th>
+                                <th>Usuario</th>
+                                <th>Rol / Barrio</th>
+                                <th>Registro</th>
                                 <th>Estado</th>
+                                <th class="text-end">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for user in usuarios %}
-                                <tr>
-                                    <td>{{ user.nombre }}</td>
-                                    <td>{{ user.email }}</td>
-                                    <td>
-                                        <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                            {{ user.rol }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if user.id != session['user_id'] %} {% if user.estado == 'activo' %}
-                                                <a href="/admin/cambiar_estado/{{ user.id }}/suspendido" class="btn btn-sm btn-outline-danger">Suspender</a>
-                                            {% else %}
-                                                <a href="/admin/cambiar_estado/{{ user.id }}/activo" class="btn btn-sm btn-outline-success">Activar</a>
-                                            {% endif %}
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if user.estado == 'activo' %}
-                                            <span class="text-success">●</span> Activo
-                                        {% else %}
-                                            <span class="text-danger">●</span> Suspendido
-                                        {% endif %}
-                                    </td>
-                                    
-                                </tr>
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ user.nombre }}</div>
+                                    <div class="text-muted small">{{ user.email }}</div>
+                                </td>
+                                <td>
+                                    <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ user.rol }}
+                                    </span>
+                                    <div class="small mt-1 text-muted">{{ user.nombre_barrio if user.nombre_barrio else 'N/A' }}</div>
+                                </td>
+                                <td class="small">{{ user.fecha_registro[:10] if user.fecha_registro else 'S/D' }}</td>
+                                <td>
+                                    <span class="badge rounded-pill {% if user.estado == 'activo' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ user.estado|capitalize }}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    {% if user.id != session['user_id'] %}
+                                        <a href="/admin/cambiar_estado/{{ user.id }}/{{ 'suspendido' if user.estado == 'activo' else 'activo' }}" 
+                                            class="btn btn-sm {% if user.estado == 'activo' %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                                            <!--<i class="bi {% if user.estado == 'activo' %}bi-person-x{% else %}bi-person-check{% endif %}"></i>-->
+                                            {{ 'Suspender' if user.estado == 'activo' else 'Activar' }}
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+
+                <div class="d-block d-md-none">
+                    {% for user in usuarios %}
+                        <div class="card border mb-3 p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-bold">{{ user.nombre }}</div>
+                                    <div class="text-muted small">{{ user.email }}</div>
+                                </div>
+                                <span class="badge {% if user.rol == 'mype' %}bg-info{% elif user.rol == 'admin' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ user.rol }}
+                                </span>
+                            </div>
+                            
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Barrio</small>
+                                    <span>{{ user.nombre_barrio if user.nombre_barrio else 'N/A' }}</span>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Estado</small>
+                                    <span class="text-{% if user.estado == 'activo' %}success{% else %}danger{% endif %} fw-bold">
+                                        {{ user.estado|capitalize }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                                <small class="text-muted">📅 {{ user.fecha_registro[:10] if user.fecha_registro else 'S/D' }}</small>
+                                {% if user.id != session['user_id'] %}
+                                    <a href="/admin/cambiar_estado/{{ user.id }}/{{ 'suspendido' if user.estado == 'activo' else 'activo' }}" 
+                                    class="btn btn-sm {% if user.estado == 'activo' %}btn-danger{% else %}btn-success{% endif %} w-50">
+                                        {{ 'Suspender' if user.estado == 'activo' else 'Activar' }}
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
+    </div>
+        <div class="row mt-4">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">📦 Categorías de Negocio</div>
+                    <div class="card-body">
+                        <form action="/admin/agregar_categoria" method="POST" class="d-flex mb-3">
+                            <input type="text" name="nombre_categoria" class="form-control me-2" placeholder="Nueva categoría" required>
+                            <button type="submit" class="btn btn-primary">Añadir</button>
+                        </form>
+                        <ul class="list-group list-group-flush">
+                            {% for cat in categorias %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ cat.nombre }}
+                                <a href="/admin/eliminar_categoria/{{ cat.id }}" class="text-danger small" onclick="return confirm('¿Eliminar?')">Eliminar</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
 
-        <div class="col-lg-4">
-            <div class="card shadow-sm border-0 p-3">
-                <h5 class="mb-3">🏷️ Categorías</h5>
-                <form action="/admin/agregar_categoria" method="POST" class="mb-3 d-flex gap-2">
-                    <input type="text" name="nombre_cat" class="form-control form-control-sm" placeholder="Nueva categoría..." required>
-                    <button type="submit" class="btn btn-primary btn-sm">Añadir</button>
-                </form>
-                <ul class="list-group list-group-flush">
-                    {% for cat in categorias %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ cat.nombre }}
-                        <a href="/admin/eliminar_categoria/{{ cat.id }}" 
-                        class="text-danger" 
-                        onclick="return confirm('¿Eliminar esta categoría?')">
-                        <small>Eliminar</small>
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100 border-primary">
+                    <div class="card-header bg-primary text-white fw-bold">📍 Barrios / Sectores</div>
+                    <div class="card-body">
+                        <form action="/admin/agregar_barrio" method="POST" class="d-flex mb-3">
+                            <input type="text" name="nombre_barrio" class="form-control me-2" placeholder="Nombre del barrio" required>
+                            <button type="submit" class="btn btn-outline-primary">Añadir</button>
+                        </form>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <ul class="list-group list-group-flush">
+                                {% for b in barrios %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="fw-bold">{{ b.nombre }}</span>
+                                            <span class="badge bg-light text-dark border ms-2">
+                                                {{ b.total_usuarios }} <i class="bi bi-people-fill small"></i>
+                                            </span>
+                                        </div>
+
+                                        <div>
+                                            {% if b.total_usuarios|default(0) == 0 %}
+                                                <a href="/admin/eliminar_barrio/{{ b.id }}" 
+                                                class="btn btn-sm btn-outline-danger border-0" 
+                                                onclick="return confirm('¿Eliminar el barrio {{ b.nombre }}?')">
+                                                <i class="bi bi-trash"></i> Eliminar
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted small" title="No se puede eliminar porque tiene usuarios registrados">
+                                                    <i class="bi bi-lock-fill"></i> Protegido
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </li>
+
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
