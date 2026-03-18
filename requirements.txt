@@ -1,0 +1,6 @@
+flask
+flask-socketio
+eventlet
+gunicorn
+werkzeug
+psycopg2-binary

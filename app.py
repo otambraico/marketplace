@@ -4,6 +4,7 @@ from werkzeug.security import check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import sqlite3
 import json
+import os
 from functools import wraps
 
 def login_required(f):
@@ -19,7 +20,11 @@ app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_para_flash' # Obligatorio para usar flash()
 
 # Inicializamos Socket.io
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Usar una clave secreta real desde las variables de entorno
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'una-clave-muy-secreta-de-prueba')
+
+# Permitir CORS solo para tu dominio (o "*" para pruebas iniciales)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Evento cuando un usuario abre cualquier chat
 @socketio.on('join')
@@ -42,7 +47,7 @@ def handle_message(data):
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
-        VALUES (?, ?, ?)
+        VALUES (%, %, %)
     ''', (emisor_id, receptor_id, mensaje))
     conn.commit()
     conn.close()
@@ -73,7 +78,7 @@ def login():
         cursor = conn.cursor()
         
         # Buscamos al usuario por email
-        cursor.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
+        cursor.execute("SELECT * FROM usuarios WHERE email = %", (email,))
         user = cursor.fetchone()
         conn.close()
         
@@ -133,7 +138,7 @@ def registro():
             # NOTA: Asegúrate que 'estado' en DB acepte 'Activo' o cámbialo a 'activo' (minúsculas) según tu lógica de login
             cursor.execute('''
                 INSERT INTO usuarios (nombre, email, password, rol, barrio_id, estado, latitud, longitud) 
-                VALUES (?, ?, ?, ?, ?, 'activo', ?, ?)
+                VALUES (%, %, %, %, %, 'activo', %, %)
             ''', (nombre, email, password, rol, barrio_id, lat, lng))
             
             usuario_id = cursor.lastrowid
@@ -146,7 +151,7 @@ def registro():
                 # Eliminamos lat/lng de aquí porque ya se guardaron en la tabla 'usuarios'
                 cursor.execute('''
                     INSERT INTO perfiles_mype (usuario_id, nombre_comercial, categoria_id) 
-                    VALUES (?, ?, ?)
+                    VALUES (%, %, %)
                 ''', (usuario_id, nombre_comercial, categoria_id))
             
             # 4. COMMIT FUERA DEL IF (Vital para que guarde tanto clientes como mypes)
@@ -200,7 +205,7 @@ def api_mypes():
         mype_dict = dict(row)
         
         # Por cada MYPE, buscamos sus últimos 3 productos/ofertas
-        cursor.execute("SELECT nombre, precio FROM productos WHERE mype_id = ? LIMIT 3", (mype_dict['mype_id'],))
+        cursor.execute("SELECT nombre, precio FROM productos WHERE mype_id = % LIMIT 3", (mype_dict['mype_id'],))
         mype_dict['productos'] = [dict(p) for p in cursor.fetchall()]
         
         resultado.append(mype_dict)
@@ -223,12 +228,12 @@ def dashboard_mype():
 
     try:    
     # Obtener los datos de la MYPE vinculada al usuario logueado
-        cursor.execute("SELECT id, nombre_comercial FROM perfiles_mype WHERE usuario_id = ?", (session['user_id'],))
+        cursor.execute("SELECT id, nombre_comercial FROM perfiles_mype WHERE usuario_id = %", (session['user_id'],))
         mype = cursor.fetchone()
         
         if mype:
             # Obtener sus productos usando el mype['id'] que acabamos de encontrar
-            cursor.execute("SELECT * FROM productos WHERE mype_id = ? ORDER BY fecha_creacion DESC", (mype['id'],))
+            cursor.execute("SELECT * FROM productos WHERE mype_id = % ORDER BY fecha_creacion DESC", (mype['id'],))
             productos = cursor.fetchall()
         else:
             productos = []
@@ -255,12 +260,12 @@ def agregar_producto():
     cursor = conn.cursor()
     
     # Buscamos el ID de la MYPE del usuario actual
-    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = ?", (session['user_id'],))
+    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %", (session['user_id'],))
     mype_id = cursor.fetchone()[0]
     
     cursor.execute('''
         INSERT INTO productos (mype_id, nombre, descripcion, precio) 
-        VALUES (?, ?, ?, ?)''', (mype_id, nombre, descripcion, precio))
+        VALUES (%, %, %, %)''', (mype_id, nombre, descripcion, precio))
     
     conn.commit()
     conn.close()
@@ -333,7 +338,7 @@ def agregar_categoria():
         nombre = request.form['nombre_categoria']
         conn = sqlite3.connect('marketplace.db')
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (?)", (nombre,))
+        cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (%)", (nombre,))
         conn.commit()
         conn.close()
         flash("Categoría añadida con éxito")
@@ -346,7 +351,7 @@ def eliminar_categoria(id):
     if session.get('user_rol') == 'admin':
         conn = sqlite3.connect('marketplace.db')
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM maestro_categorias WHERE id = ?", (id,))
+        cursor.execute("DELETE FROM maestro_categorias WHERE id = %", (id,))
         conn.commit()
         conn.close()
         flash("Categoría eliminada.")
@@ -360,7 +365,7 @@ def cambiar_estado(usuario_id, nuevo_estado):
     
     conn = sqlite3.connect('marketplace.db')
     cursor = conn.cursor()
-    cursor.execute("UPDATE usuarios SET estado = ? WHERE id = ?", (nuevo_estado, usuario_id))
+    cursor.execute("UPDATE usuarios SET estado = % WHERE id = %", (nuevo_estado, usuario_id))
     conn.commit()
     conn.close()
     
@@ -378,7 +383,7 @@ def agregar_barrio():
             conn = sqlite3.connect('marketplace.db')
             cursor = conn.cursor()
             try:
-                cursor.execute("INSERT INTO maestro_barrios (nombre) VALUES (?)", (nombre,))
+                cursor.execute("INSERT INTO maestro_barrios (nombre) VALUES (%)", (nombre,))
                 conn.commit()
                 flash(f"Barrio '{nombre}' agregado correctamente.", "success")
             except sqlite3.IntegrityError:
@@ -395,13 +400,13 @@ def eliminar_barrio(id):
         cursor = conn.cursor()
         try:
             # Verificamos si hay usuarios en este barrio antes de borrar
-            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE barrio_id = ?", (id,))
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE barrio_id = %", (id,))
             count = cursor.fetchone()[0]
             
             if count > 0:
                 flash(f"No se puede eliminar: hay {count} usuarios registrados en este barrio.", "danger")
             else:
-                cursor.execute("DELETE FROM maestro_barrios WHERE id = ?", (id,))
+                cursor.execute("DELETE FROM maestro_barrios WHERE id = %", (id,))
                 conn.commit()
                 flash("Barrio eliminado con éxito.", "success")
         except Exception as e:
@@ -449,7 +454,7 @@ def chat_personal(receptor_id):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    cursor.execute("SELECT nombre FROM usuarios WHERE id = ?", (receptor_id,))
+    cursor.execute("SELECT nombre FROM usuarios WHERE id = %", (receptor_id,))
     receptor = cursor.fetchone()
     
     # 2. Cargar historial de mensajes entre estos dos usuarios
@@ -457,8 +462,8 @@ def chat_personal(receptor_id):
         SELECT m.*, u.nombre as emisor_nombre 
         FROM mensajes m
         JOIN usuarios u ON m.emisor_id = u.id
-        WHERE (emisor_id = ? AND receptor_id = ?) 
-           OR (emisor_id = ? AND receptor_id = ?)
+        WHERE (emisor_id = % AND receptor_id = %) 
+           OR (emisor_id = % AND receptor_id = %)
         ORDER BY fecha ASC
     ''', (emisor_id, receptor_id, receptor_id, emisor_id))
     

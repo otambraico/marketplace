@@ -1,16 +1,23 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import os
+
+# Render o Supabase te darán esta URL (empieza con postgres://)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db_connection():
+    # Establece conexión con el servidor remoto
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return conn
 
 def init_db():
-    conn = sqlite3.connect('marketplace.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Activar el soporte para llaves foráneas en SQLite
-    cursor.execute('PRAGMA foreign_keys = ON')
 
     # 1. TABLA MAESTRA: Categorías
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS maestro_categorias (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             nombre TEXT UNIQUE NOT NULL
         )
     ''')
@@ -18,80 +25,81 @@ def init_db():
     # 2. TABLA MAESTRA: Barrios/Sectores
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS maestro_barrios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             nombre TEXT UNIQUE NOT NULL
         )
     ''')
 
-    # 3. TABLA: Usuarios 
-    # NOTA: He incluido 'barrio_id' aquí para que Clientes y Mypes lo tengan por igual
-    # También incluimos 'estado' y 'fecha_registro' desde el inicio
+    # 3. TABLA: Usuarios
+    # Cambiamos REAL por DOUBLE PRECISION para mayor precisión en mapas
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             nombre TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             rol TEXT CHECK(rol IN ('mype', 'cliente', 'admin')) DEFAULT 'cliente',
-            barrio_id INTEGER,
+            barrio_id INTEGER REFERENCES maestro_barrios(id),
             estado TEXT DEFAULT 'activo',
-            latitud REAL, 
-            longitud REAL,
-            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (barrio_id) REFERENCES maestro_barrios(id)
+            latitud DOUBLE PRECISION, 
+            longitud DOUBLE PRECISION,
+            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
     # 4. TABLA: Perfil MYPE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS perfiles_mype (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER,
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER REFERENCES usuarios(id),
             nombre_comercial TEXT,
             descripcion TEXT,
-            categoria_id INTEGER,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-            FOREIGN KEY (categoria_id) REFERENCES maestro_categorias(id)
+            categoria_id INTEGER REFERENCES maestro_categorias(id)
         )
     ''')
 
     # 5. TABLA: Productos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS productos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mype_id INTEGER,
+            id SERIAL PRIMARY KEY,
+            mype_id INTEGER REFERENCES perfiles_mype(id),
             nombre TEXT NOT NULL,
             descripcion TEXT,
-            precio REAL NOT NULL,
+            precio DOUBLE PRECISION NOT NULL,
             foto_url TEXT,
-            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (mype_id) REFERENCES perfiles_mype(id)
+            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Dentro de init_db() en tu archivo de base de datos:
+    # 6. TABLA: Mensajes (Chat)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS mensajes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            emisor_id INTEGER,
-            receptor_id INTEGER,
+            id SERIAL PRIMARY KEY,
+            emisor_id INTEGER REFERENCES usuarios(id),
+            receptor_id INTEGER REFERENCES usuarios(id),
             contenido TEXT NOT NULL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (emisor_id) REFERENCES usuarios(id),
-            FOREIGN KEY (receptor_id) REFERENCES usuarios(id)
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
     # --- PRECARGA DE DATOS ---
+    # En Postgres usamos "ON CONFLICT" en lugar de "INSERT OR IGNORE"
     categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
-    cursor.executemany('INSERT OR IGNORE INTO maestro_categorias (nombre) VALUES (?)', categorias)
+    cursor.executemany('''
+        INSERT INTO maestro_categorias (nombre) VALUES (%s) 
+        ON CONFLICT (nombre) DO NOTHING
+    ''', categorias)
 
     barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',), ('Zona Residencial',), ('Barrio Comercial',)]
-    cursor.executemany('INSERT OR IGNORE INTO maestro_barrios (nombre) VALUES (?)', barrios)
+    cursor.executemany('''
+        INSERT INTO maestro_barrios (nombre) VALUES (%s) 
+        ON CONFLICT (nombre) DO NOTHING
+    ''', barrios)
     
     conn.commit()
+    cursor.close()
     conn.close()
-    print("✅ Base de datos 'marketplace.db' creada y poblada con éxito.")
+    print("✅ PostgreSQL inicializado y poblado con éxito.")
 
 if __name__ == "__main__":
     init_db()

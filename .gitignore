@@ -1,4 +1,5 @@
 marketplace.db
+consultar_bd.py
 __pycache__/
 *.pyc
 .env
