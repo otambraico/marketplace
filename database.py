@@ -69,6 +69,19 @@ def init_db():
         )
     ''')
 
+    # Dentro de init_db() en tu archivo de base de datos:
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mensajes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            emisor_id INTEGER,
+            receptor_id INTEGER,
+            contenido TEXT NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (emisor_id) REFERENCES usuarios(id),
+            FOREIGN KEY (receptor_id) REFERENCES usuarios(id)
+        )
+    ''')
+
     # --- PRECARGA DE DATOS ---
     categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
     cursor.executemany('INSERT OR IGNORE INTO maestro_categorias (nombre) VALUES (?)', categorias)

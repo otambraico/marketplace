@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import sqlite3
 import json
 from functools import wraps
@@ -16,6 +17,50 @@ def login_required(f):
 
 app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_para_flash' # Obligatorio para usar flash()
+
+# Inicializamos Socket.io
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Evento cuando un usuario abre cualquier chat
+@socketio.on('join')
+def on_join(data):
+    # El usuario se une a una sala con su propio ID
+    # Esto permite que el servidor le envíe mensajes privados
+    room = str(session.get('user_id'))
+    join_room(room)
+    print(f"📡 Usuario {session.get('user_nombre')} entró a su sala privada: {room}")
+
+@socketio.on('enviar_mensaje')
+def handle_message(data):
+    emisor_id = session.get('user_id')
+    receptor_id = data['receptor_id']
+    mensaje = data['mensaje']
+    emisor_nombre = session.get('user_nombre')
+
+    # 1. Guardar en la Base de Datos (Persistencia)
+    conn = sqlite3.connect('marketplace.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
+        VALUES (?, ?, ?)
+    ''', (emisor_id, receptor_id, mensaje))
+    conn.commit()
+    conn.close()
+
+    # 2. Enviar el mensaje SOLO a los dos involucrados
+    # Enviamos a la sala del receptor
+    emit('nuevo_mensaje', {
+        'msg': mensaje,
+        'de': emisor_nombre,
+        'de_id': emisor_id
+    }, room=str(receptor_id))
+
+    # Enviamos a la sala del emisor (para que vea su propio mensaje en tiempo real)
+    emit('nuevo_mensaje', {
+        'msg': mensaje,
+        'de': emisor_nombre,
+        'de_id': emisor_id
+    }, room=str(emisor_id))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -365,5 +410,63 @@ def eliminar_barrio(id):
             conn.close()
     return redirect('/admin')
 
+# ---------------------------------------------------------
+# EVENTOS DE SOCKET.IO (Lógica del Chat)
+# ---------------------------------------------------------
+
+@socketio.on('connect')
+def handle_connect():
+    print(f"✅ Usuario conectado: {session.get('user_nombre')}")
+
+@socketio.on('enviar_mensaje')
+def handle_message(data):
+    """
+    data contiene: { 'receptor_id': X, 'mensaje': 'hola', 'emisor_nombre': 'Pepe' }
+    """
+    mensaje = data['mensaje']
+    receptor_id = data['receptor_id']
+    emisor_id = session.get('user_id')
+    emisor_nombre = session.get('user_nombre')
+
+    # Guardar en la base de datos (Opcional por ahora, pero recomendado)
+    # conn = sqlite3.connect('marketplace.db')
+    # ... código para INSERT INTO mensajes ...
+    
+    # Emitir el mensaje al receptor
+    emit('nuevo_mensaje', {
+        'msg': mensaje,
+        'de': emisor_nombre,
+        'de_id': emisor_id
+    }, broadcast=True) # Por ahora lo enviamos a todos para probar, luego lo filtramos por salas
+
+@app.route('/chat/<int:receptor_id>')
+@login_required
+def chat_personal(receptor_id):
+    emisor_id = session.get('user_id')
+    
+    # 1. Obtener datos del receptor para mostrar su nombre en el chat
+    conn = sqlite3.connect('marketplace.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT nombre FROM usuarios WHERE id = ?", (receptor_id,))
+    receptor = cursor.fetchone()
+    
+    # 2. Cargar historial de mensajes entre estos dos usuarios
+    cursor.execute('''
+        SELECT m.*, u.nombre as emisor_nombre 
+        FROM mensajes m
+        JOIN usuarios u ON m.emisor_id = u.id
+        WHERE (emisor_id = ? AND receptor_id = ?) 
+           OR (emisor_id = ? AND receptor_id = ?)
+        ORDER BY fecha ASC
+    ''', (emisor_id, receptor_id, receptor_id, emisor_id))
+    
+    historial = cursor.fetchall()
+    conn.close()
+
+    return render_template('chat.html', receptor=receptor, receptor_id=receptor_id, historial=historial)
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    #app.run(debug=True)
+    socketio.run(app, debug=True)
