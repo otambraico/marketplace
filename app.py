@@ -2,10 +2,19 @@ from flask import Flask, render_template, request, redirect, flash, session, jso
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
-import sqlite3
 import json
+import psycopg2
+from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
 import os
 from functools import wraps
+
+# Configuración de base de datos para Render
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db_connection():
+    # En PostgreSQL usamos RealDictCursor para emular el row_factory de SQLite [cite: 12, 20]
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return conn
 
 def login_required(f):
     @wraps(f)
@@ -38,29 +47,30 @@ def on_join(data):
 @socketio.on('enviar_mensaje')
 def handle_message(data):
     emisor_id = session.get('user_id')
-    receptor_id = data['receptor_id']
+    receptor_id = data['receptor_id'] # 
     mensaje = data['mensaje']
     emisor_nombre = session.get('user_nombre')
 
-    # 1. Guardar en la Base de Datos (Persistencia)
-    conn = sqlite3.connect('marketplace.db')
+    # 1. Guardar en PostgreSQL
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
-        VALUES (%, %, %)
-    ''', (emisor_id, receptor_id, mensaje))
+        VALUES (%s, %s, %s)
+    ''', (emisor_id, receptor_id, mensaje)) # 
     conn.commit()
+    cursor.close()
     conn.close()
 
-    # 2. Enviar el mensaje SOLO a los dos involucrados
-    # Enviamos a la sala del receptor
+    # 2. Envío privado por salas (Rooms)
+    # Enviamos al receptor [cite: 4]
     emit('nuevo_mensaje', {
         'msg': mensaje,
         'de': emisor_nombre,
         'de_id': emisor_id
     }, room=str(receptor_id))
 
-    # Enviamos a la sala del emisor (para que vea su propio mensaje en tiempo real)
+    # Enviamos al emisor para feedback inmediato [cite: 5]
     emit('nuevo_mensaje', {
         'msg': mensaje,
         'de': emisor_nombre,
@@ -73,20 +83,16 @@ def login():
         email = request.form['email']
         password = request.form['password']
                 
-        conn = sqlite3.connect('marketplace.db')
-        conn.row_factory = sqlite3.Row
+        conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Buscamos al usuario por email
-        cursor.execute("SELECT * FROM usuarios WHERE email = %", (email,))
+        cursor.execute("SELECT * FROM usuarios WHERE email = %s", (email,)) # [cite: 6]
         user = cursor.fetchone()
+        cursor.close()
         conn.close()
         
         # 1. Validamos si el usuario existe
-        if user:
+        if user and check_password_hash(user['password'], password):
             # 2. Validamos la contraseña
-            if check_password_hash(user['password'], password):
-
                 if user['estado'] != 'activo':
                    flash("⚠️ Tu cuenta está suspendida. Contacta al administrador.")
                    return redirect('/login')
@@ -104,10 +110,9 @@ def login():
                 elif user['rol'] == 'mype':
                     return redirect('/dashboard_mype')
                 return redirect('/') # El cliente vuelve al mapa
-            else:
-                flash("❌ Contraseña incorrecta.", "warning")
+                 
         else:
-            flash("❌ El correo electrónico no está registrado.", "danger")
+            flash("❌ El correo electrónico o la contraseña no está registrado.", "danger")
             
     return render_template('login.html')
 
@@ -119,10 +124,8 @@ def logout():
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
-    conn = sqlite3.connect('marketplace.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
-
     if request.method == 'POST':
         # 1. Captura de datos
         nombre = request.form['nombre']
@@ -138,10 +141,11 @@ def registro():
             # NOTA: Asegúrate que 'estado' en DB acepte 'Activo' o cámbialo a 'activo' (minúsculas) según tu lógica de login
             cursor.execute('''
                 INSERT INTO usuarios (nombre, email, password, rol, barrio_id, estado, latitud, longitud) 
-                VALUES (%, %, %, %, %, 'activo', %, %)
+                VALUES (%s, %s, %s, %s, %s, 'activo', %s, %s) RETURNING id
             ''', (nombre, email, password, rol, barrio_id, lat, lng))
             
-            usuario_id = cursor.lastrowid
+            # En PostgreSQL usamos RETURNING id o fetchone después del insert
+            usuario_id = cursor.fetchone()['id']
 
             # 3. Si es MYPE, crear su perfil comercial
             if rol == 'mype':
@@ -151,7 +155,7 @@ def registro():
                 # Eliminamos lat/lng de aquí porque ya se guardaron en la tabla 'usuarios'
                 cursor.execute('''
                     INSERT INTO perfiles_mype (usuario_id, nombre_comercial, categoria_id) 
-                    VALUES (%, %, %)
+                    VALUES (%s, %s, %s)
                 ''', (usuario_id, nombre_comercial, categoria_id))
             
             # 4. COMMIT FUERA DEL IF (Vital para que guarde tanto clientes como mypes)
@@ -165,6 +169,7 @@ def registro():
             flash(f"Error: Datos incompletos o el correo ya existe.", "danger")
             return redirect('/registro')
         finally:
+            cursor.close()    
             conn.close()
 
     # Lógica GET
@@ -172,6 +177,7 @@ def registro():
     barrios = cursor.fetchall()
     cursor.execute("SELECT * FROM maestro_categorias")
     categorias = cursor.fetchall()
+    cursor.close()
     conn.close()
     
     return render_template('registro.html', barrios=barrios, categorias=categorias)
@@ -184,8 +190,7 @@ def home():
 
 @app.route('/api/mypes')
 def api_mypes():
-    conn = sqlite3.connect('marketplace.db')
-    conn.row_factory = sqlite3.Row # Esto nos permite acceder por nombre de columna
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Traemos las MYPES unidas a sus nombres comerciales y categorías
@@ -205,11 +210,11 @@ def api_mypes():
         mype_dict = dict(row)
         
         # Por cada MYPE, buscamos sus últimos 3 productos/ofertas
-        cursor.execute("SELECT nombre, precio FROM productos WHERE mype_id = % LIMIT 3", (mype_dict['mype_id'],))
+        cursor.execute("SELECT nombre, precio FROM productos WHERE mype_id = %s LIMIT 3", (mype_dict['mype_id'],))
         mype_dict['productos'] = [dict(p) for p in cursor.fetchall()]
-        
         resultado.append(mype_dict)
         
+    cursor.close()
     conn.close()
     return jsonify(resultado) # Usa jsonify de Flask para asegurar el formato correcto
 
@@ -222,18 +227,17 @@ def dashboard_mype():
         return redirect('/')
     
 # 2. Conexión y consulta (TODO esto debe estar indentado dentro de la función)
-    conn = sqlite3.connect('marketplace.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:    
     # Obtener los datos de la MYPE vinculada al usuario logueado
-        cursor.execute("SELECT id, nombre_comercial FROM perfiles_mype WHERE usuario_id = %", (session['user_id'],))
+        cursor.execute("SELECT id, nombre_comercial FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
         mype = cursor.fetchone()
         
         if mype:
             # Obtener sus productos usando el mype['id'] que acabamos de encontrar
-            cursor.execute("SELECT * FROM productos WHERE mype_id = % ORDER BY fecha_creacion DESC", (mype['id'],))
+            cursor.execute("SELECT * FROM productos WHERE mype_id = %s ORDER BY fecha_creacion DESC", (mype['id'],))
             productos = cursor.fetchall()
         else:
             productos = []
@@ -256,18 +260,19 @@ def agregar_producto():
     descripcion = request.form['descripcion']
     precio = request.form['precio']
     
-    conn = sqlite3.connect('marketplace.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Buscamos el ID de la MYPE del usuario actual
-    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %", (session['user_id'],))
+    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
     mype_id = cursor.fetchone()[0]
     
     cursor.execute('''
         INSERT INTO productos (mype_id, nombre, descripcion, precio) 
-        VALUES (%, %, %, %)''', (mype_id, nombre, descripcion, precio))
+        VALUES (%s, %s, %s, %s)''', (mype_id, nombre, descripcion, precio))
     
     conn.commit()
+    cursor.close()
     conn.close()
     flash("✅ Producto publicado con éxito")
     return redirect('/dashboard_mype')
@@ -281,8 +286,7 @@ def admin_panel():
         return redirect('/')
     # flash("Acceso restringido.")
             
-    conn = sqlite3.connect('marketplace.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # 1. Usuarios con su barrio (JOIN para la tabla principal de usuarios)
@@ -321,6 +325,7 @@ def admin_panel():
     cursor.execute("SELECT * FROM maestro_categorias")
     categorias = cursor.fetchall()
      
+    cursor.close()
     conn.close()
     return render_template('admin.html', 
                            mypes=total_mypes, 
@@ -336,10 +341,11 @@ def admin_panel():
 def agregar_categoria():
     if session.get('user_rol') == 'admin':
         nombre = request.form['nombre_categoria']
-        conn = sqlite3.connect('marketplace.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (%)", (nombre,))
+        cursor.execute("INSERT INTO maestro_categorias (nombre) VALUES (%s)", (nombre,))
         conn.commit()
+        cursor.close()
         conn.close()
         flash("Categoría añadida con éxito")
     return redirect('/admin')
@@ -349,10 +355,11 @@ def agregar_categoria():
 @login_required
 def eliminar_categoria(id):
     if session.get('user_rol') == 'admin':
-        conn = sqlite3.connect('marketplace.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM maestro_categorias WHERE id = %", (id,))
+        cursor.execute("DELETE FROM maestro_categorias WHERE id = %s", (id,))
         conn.commit()
+        cursor.close()
         conn.close()
         flash("Categoría eliminada.")
     return redirect('/admin')
@@ -363,10 +370,11 @@ def cambiar_estado(usuario_id, nuevo_estado):
     if session.get('user_rol') != 'admin':
         return redirect('/')
     
-    conn = sqlite3.connect('marketplace.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE usuarios SET estado = % WHERE id = %", (nuevo_estado, usuario_id))
+    cursor.execute("UPDATE usuarios SET estado = %s WHERE id = %s", (nuevo_estado, usuario_id))
     conn.commit()
+    cursor.close()
     conn.close()
     
     flash(f"Usuario actualizado a: {nuevo_estado}")
@@ -380,15 +388,17 @@ def agregar_barrio():
     if session.get('user_rol') == 'admin':
         nombre = request.form.get('nombre_barrio')
         if nombre:
-            conn = sqlite3.connect('marketplace.db')
+            conn = get_db_connection()
             cursor = conn.cursor()
             try:
-                cursor.execute("INSERT INTO maestro_barrios (nombre) VALUES (%)", (nombre,))
+                cursor.execute("INSERT INTO maestro_barrios (nombre) VALUES (%s)", (nombre,))
                 conn.commit()
                 flash(f"Barrio '{nombre}' agregado correctamente.", "success")
-            except sqlite3.IntegrityError:
-                flash("Ese barrio ya existe.", "warning")
+            except Exception as e: # Captura general o IntegrityError de psycopg2
+                conn.rollback()
+                flash("Ese barrio ya existe o hubo un error.", "warning")
             finally:
+                cursor.close()
                 conn.close()
     return redirect('/admin')
 
@@ -396,22 +406,25 @@ def agregar_barrio():
 @login_required
 def eliminar_barrio(id):
     if session.get('user_rol') == 'admin':
-        conn = sqlite3.connect('marketplace.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         try:
             # Verificamos si hay usuarios en este barrio antes de borrar
-            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE barrio_id = %", (id,))
-            count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE barrio_id = %s", (id,))
+            result = cursor.fetchone()
+            count = result['count'] # Acceso por nombre de columna (RealDictCursor)
+
             
             if count > 0:
                 flash(f"No se puede eliminar: hay {count} usuarios registrados en este barrio.", "danger")
             else:
-                cursor.execute("DELETE FROM maestro_barrios WHERE id = %", (id,))
+                cursor.execute("DELETE FROM maestro_barrios WHERE id = %s", (id,))
                 conn.commit()
                 flash("Barrio eliminado con éxito.", "success")
         except Exception as e:
             flash(f"Error al eliminar: {e}", "danger")
         finally:
+            cursor.close()
             conn.close()
     return redirect('/admin')
 
@@ -434,15 +447,35 @@ def handle_message(data):
     emisor_nombre = session.get('user_nombre')
 
     # Guardar en la base de datos (Opcional por ahora, pero recomendado)
-    # conn = sqlite3.connect('marketplace.db')
-    # ... código para INSERT INTO mensajes ...
+    if not mensaje or not receptor_id:
+        return
+
+    # 1. Guardar en PostgreSQL (Persistencia Real)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
+            VALUES (%s, %s, %s)
+        ''', (emisor_id, receptor_id, mensaje))
+        conn.commit()
+    except Exception as e:
+        print(f"❌ Error al guardar mensaje: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
     
-    # Emitir el mensaje al receptor
-    emit('nuevo_mensaje', {
+    # 2. Emitir el mensaje de forma PRIVADA
+    # Enviamos a la sala del receptor y a la del emisor
+    payload = {
         'msg': mensaje,
         'de': emisor_nombre,
         'de_id': emisor_id
-    }, broadcast=True) # Por ahora lo enviamos a todos para probar, luego lo filtramos por salas
+    }
+    
+    emit('nuevo_mensaje', payload, room=str(receptor_id))
+    emit('nuevo_mensaje', payload, room=str(emisor_id))
 
 @app.route('/chat/<int:receptor_id>')
 @login_required
@@ -450,28 +483,44 @@ def chat_personal(receptor_id):
     emisor_id = session.get('user_id')
     
     # 1. Obtener datos del receptor para mostrar su nombre en el chat
-    conn = sqlite3.connect('marketplace.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT nombre FROM usuarios WHERE id = %", (receptor_id,))
+    cursor.execute("SELECT nombre FROM usuarios WHERE id = %s", (receptor_id,))
     receptor = cursor.fetchone()
     
+    if not receptor:
+        cursor.close()
+        conn.close()
+        flash("El usuario no existe.", "warning")
+        return redirect('/')
+
     # 2. Cargar historial de mensajes entre estos dos usuarios
     cursor.execute('''
         SELECT m.*, u.nombre as emisor_nombre 
         FROM mensajes m
         JOIN usuarios u ON m.emisor_id = u.id
-        WHERE (emisor_id = % AND receptor_id = %) 
-           OR (emisor_id = % AND receptor_id = %)
-        ORDER BY fecha ASC
+        WHERE (m.emisor_id = %s AND m.receptor_id = %s) 
+           OR (m.emisor_id = %s AND m.receptor_id = %s)
+        ORDER BY m.fecha ASC
     ''', (emisor_id, receptor_id, receptor_id, emisor_id))
     
     historial = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     return render_template('chat.html', receptor=receptor, receptor_id=receptor_id, historial=historial)
 
 if __name__ == '__main__':
+    try:
+        from database import init_db
+        init_db()
+        print("✅ Tablas verificadas/creadas en PostgreSQL")
+    except Exception as e:
+        print(f"⚠️ Error al inicializar DB: {e}")
+    # Usamos el puerto definido por Render o 5000 por defecto
+    port = int(os.environ.get('PORT', 5000))
+    # host='0.0.0.0' es obligatorio para despliegues en la nube
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
     #app.run(debug=True)
     socketio.run(app, debug=True)
