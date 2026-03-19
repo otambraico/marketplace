@@ -122,7 +122,7 @@
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center border-top pt-2">
-                                <small class="text-muted">📅 {{ user.fecha_registro[:10] if user.fecha_registro else 'S/D' }}</small>
+                                <small class="text-muted">📅 {{ user.fecha_registro.strftime('%Y-%m-%d') if user.fecha_registro else 'S/D' }}</small>
                                 {% if user.id != session['user_id'] %}
                                     <a href="/admin/cambiar_estado/{{ user.id }}/{{ 'suspendido' if user.estado == 'activo' else 'activo' }}" 
                                     class="btn btn-sm {% if user.estado == 'activo' %}btn-danger{% else %}btn-success{% endif %} w-50">
