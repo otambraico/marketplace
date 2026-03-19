@@ -520,15 +520,17 @@ def chat_personal(receptor_id):
     return render_template('chat.html', receptor=receptor, receptor_id=receptor_id, historial=historial)
 
 if __name__ == '__main__':
+    # 1. Importamos la función de inicialización
+    from database import init_db
+    
     try:
-        from database import init_db
+        # 2. Ejecutamos la creación de tablas antes de iniciar el servidor
+        print("🛠️ Verificando tablas en PostgreSQL...")
         init_db()
-        print("✅ Tablas verificadas/creadas en PostgreSQL")
+        print("✅ Tablas listas.")
     except Exception as e:
-        print(f"⚠️ Error al inicializar DB: {e}")
-    # Usamos el puerto definido por Render o 5000 por defecto
-    port = int(os.environ.get('PORT', 5000))
-    # host='0.0.0.0' es obligatorio para despliegues en la nube
+        print(f"❌ Error al inicializar tablas: {e}")
+
+    # 3. Arrancamos Socket.io
+    port = int(os.environ.get('PORT', 10000)) # Render usa el puerto 10000 según tu log
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
-    #app.run(debug=True)
-    socketio.run(app, debug=True)
