@@ -224,23 +224,29 @@ def api_mypes():
     
     # Traemos las MYPES unidas a sus nombres comerciales y categorías
     query = '''
-        SELECT u.latitud, u.longitud, p.nombre_comercial, c.nombre as categoria, p.id AS mype_id
+        SELECT u.id as mype_id, p.id as perfil_id, p.nombre_comercial, 
+               u.latitud, u.longitud, c.nombre as categoria
         FROM usuarios u
         JOIN perfiles_mype p ON u.id = p.usuario_id
         JOIN maestro_categorias c ON p.categoria_id = c.id
-        WHERE u.rol = 'mype'
+        WHERE u.estado = 'activo'
     '''
     cursor.execute(query)
-    mypes_rows = cursor.fetchall()
+    mypes = cursor.fetchall()
     
     resultado = []
-    for row in mypes_rows:
+    for mype in mypes:
         # Convertimos la fila a un diccionario real de Python
-        mype_dict = dict(row)
+        mype_dict = dict(mype)
         
-        # Por cada MYPE, buscamos sus últimos 3 productos/ofertas
-        cursor.execute("SELECT nombre, precio FROM productos WHERE mype_id = %s LIMIT 3", (mype_dict['mype_id'],))
-        mype_dict['productos'] = [dict(p) for p in cursor.fetchall()]
+        # 2. Por cada MYPE, buscamos sus productos
+        cursor.execute(
+            "SELECT nombre, precio FROM productos WHERE mype_id = %s", 
+            (mype_dict['perfil_id'],)
+        )
+        # Agregamos la lista de productos al diccionario de la MYPE
+        mype_dict['productos'] = cursor.fetchall()
+        
         resultado.append(mype_dict)
         
     cursor.close()
