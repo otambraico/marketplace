@@ -13,6 +13,28 @@ import os
 from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
+
+from werkzeug.security import generate_password_hash
+
+@app.route('/fix_admin')
+def fix_admin():
+    nueva_pass = generate_password_hash("admin1234")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Actualizamos la contraseña del admin con el hash generado por TU sistema
+        cursor.execute(
+            "UPDATE usuarios SET password = %s WHERE email = 'admin@marketplace.com'", 
+            (nueva_pass,)
+        )
+        conn.commit()
+        return f"✅ Password de Admin actualizada. Copia este hash si quieres guardarlo: {nueva_pass}"
+    except Exception as e:
+        return f"❌ Error: {e}"
+    finally:
+        cursor.close()
+        conn.close()
+
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
 # --- 2. Inicializar después de definir la conexión ---
 with app.app_context():
@@ -23,7 +45,7 @@ with app.app_context():
         print("✅ Tablas creadas/verificadas exitosamente.")
     except Exception as e:
         print(f"❌ Error crítico al inicializar DB: {e}")
-        
+
 def get_db_connection():
     url = os.environ.get('DATABASE_URL')
     if url and url.startswith("postgres://"):
