@@ -14,7 +14,16 @@ from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
-
+# --- 2. Inicializar después de definir la conexión ---
+with app.app_context():
+    try:
+        print("🛠️ Iniciando creación de tablas en PostgreSQL...")
+        # Asegúrate que init_db en database.py use la función local o importada correctamente
+        init_db() #[cite: 32]
+        print("✅ Tablas creadas/verificadas exitosamente.")
+    except Exception as e:
+        print(f"❌ Error crítico al inicializar DB: {e}")
+        
 def get_db_connection():
     url = os.environ.get('DATABASE_URL')
     if url and url.startswith("postgres://"):
@@ -27,16 +36,6 @@ def get_db_connection():
     except Exception as e:
         print(f"❌ Error de conexión: {e}") #[cite: 16]
         raise e
-    
-# --- 2. Inicializar después de definir la conexión ---
-with app.app_context():
-    try:
-        print("🛠️ Iniciando creación de tablas en PostgreSQL...")
-        # Asegúrate que init_db en database.py use la función local o importada correctamente
-        init_db() #[cite: 32]
-        print("✅ Tablas creadas/verificadas exitosamente.")
-    except Exception as e:
-        print(f"❌ Error crítico al inicializar DB: {e}")
 
 # Configuración de base de datos para Render
 

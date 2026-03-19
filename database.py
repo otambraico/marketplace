@@ -14,21 +14,9 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Crear tablas con SERIAL [cite: 14]
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS maestro_barrios (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT UNIQUE NOT NULL
-        )
-    ''')
-
-    # 2. TABLA MAESTRA: Barrios/Sectores
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS maestro_barrios (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT UNIQUE NOT NULL
-        )
-    ''')
+    # Creamos las tablas maestras primero
+    cursor.execute('CREATE TABLE IF NOT EXISTS maestro_categorias (id SERIAL PRIMARY KEY, nombre TEXT UNIQUE NOT NULL)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS maestro_barrios (id SERIAL PRIMARY KEY, nombre TEXT UNIQUE NOT NULL)')
 
     # 3. TABLA: Usuarios
     # Cambiamos REAL por DOUBLE PRECISION para mayor precisión en mapas
@@ -91,23 +79,19 @@ def init_db():
     conn = get_db_connection() #[cite: 16]
     cursor = conn.cursor()
     
-    categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
-    cursor.executemany('''
-        INSERT INTO maestro_categorias (nombre) VALUES (%s) 
-        ON CONFLICT (nombre) DO NOTHING
-    ''', categorias)
+    try:
+        categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
+        cursor.executemany('INSERT INTO maestro_categorias (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING', categorias)
 
-    # Precarga de datos con ON CONFLICT para PostgreSQL
-    barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',)]
-    cursor.executemany('''
-        INSERT INTO maestro_barrios (nombre) VALUES (%s) 
-        ON CONFLICT (nombre) DO NOTHING
-    ''', barrios)
+        barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',)]
+        cursor.executemany('INSERT INTO maestro_barrios (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING', barrios)
+        
+        conn.commit()
+        print("✅ PostgreSQL inicializado y poblado con éxito.")
+    except Exception as e:
+        print(f"⚠️ Error en precarga (posiblemente ya existen datos): {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
     
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("✅ PostgreSQL inicializado y poblado con éxito.")
-
-if __name__ == "__main__":
-    init_db()
