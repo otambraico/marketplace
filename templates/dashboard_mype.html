@@ -65,8 +65,14 @@
                     <tr>
                         <td><strong>{{ p.nombre }}</strong></td>
                         <td>S/{{ p.precio }}</td>
-                        <td>{{ p.fecha_creacion[:10] }}</td>
-                        <td><a href="#" style="color:red;">Eliminar</a></td>
+                        <td>{{ p.fecha_creacion.strftime('%Y-%m-%d') if p.fecha_creacion else 'S/D' }}</td>
+                        <td>
+                            <a href="/eliminar_producto/{{ p.id }}" 
+                            style="color:red; text-decoration:none;" 
+                            onclick="return confirm('¿Estás seguro de eliminar este producto?')">
+                            🗑️ Eliminar
+                            </a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

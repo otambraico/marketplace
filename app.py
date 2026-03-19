@@ -255,29 +255,20 @@ def dashboard_mype():
         flash("Acceso denegado: Esta área es solo para negocios.")
         return redirect('/')
     
-# 2. Conexión y consulta (TODO esto debe estar indentado dentro de la función)
+    # 2. Conexión y consulta (TODO esto debe estar indentado dentro de la función)
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    try:    
-    # Obtener los datos de la MYPE vinculada al usuario logueado
-        cursor.execute("SELECT id, nombre_comercial FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
-        mype = cursor.fetchone()
-        
-        if mype:
-            # Obtener sus productos usando el mype['id'] que acabamos de encontrar
-            cursor.execute("SELECT * FROM productos WHERE mype_id = %s ORDER BY fecha_creacion DESC", (mype['id'],))
-            productos = cursor.fetchall()
-        else:
-            productos = []
-            flash("Perfil de MYPE no encontrado.")
-            
-    except Exception as e:
-        flash(f"Error al cargar productos: {e}")
-        productos = []
-        mype = None
-    finally:
-        conn.close()
+    # Obtener datos de la MYPE
+    cursor.execute("SELECT * FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
+    mype = cursor.fetchone()
+    
+    # Obtener productos (Aquí es donde se generan los datos para el loop de la tabla)
+    cursor.execute("SELECT * FROM productos WHERE mype_id = %s ORDER BY fecha_creacion DESC", (mype['id'],))
+    productos = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
     
     # 3. Renderizado único al final con todos los datos
     return render_template('dashboard_mype.html', mype=mype, productos=productos)
@@ -285,25 +276,84 @@ def dashboard_mype():
 @app.route('/agregar_producto', methods=['POST'])
 @login_required
 def agregar_producto():
-    nombre = request.form['nombre']
-    descripcion = request.form['descripcion']
-    precio = request.form['precio']
-    
+        
     conn = get_db_connection()
     cursor = conn.cursor()
     
     # Buscamos el ID de la MYPE del usuario actual
+    # 1. Obtener el ID del perfil MYPE del usuario actual
     cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
-    mype_id = cursor.fetchone()[0]
+    mype = cursor.fetchone()
     
-    cursor.execute('''
-        INSERT INTO productos (mype_id, nombre, descripcion, precio) 
-        VALUES (%s, %s, %s, %s)''', (mype_id, nombre, descripcion, precio))
+    if not mype:
+        flash("Error: No se encontró perfil MYPE asociado.", "danger")
+        return redirect('/dashboard_mype')
+
+    # CAMBIO CRÍTICO: Acceder por nombre de columna 'id'
+    mype_id = mype['id']
     
-    conn.commit()
-    cursor.close()
-    conn.close()
-    flash("✅ Producto publicado con éxito")
+    nombre = request.form['nombre']
+    descripcion = request.form['descripcion']
+    precio = request.form['precio']
+
+    try:
+        # 3. Insertar producto usando marcadores %s
+        cursor.execute('''
+            INSERT INTO productos (mype_id, nombre, descripcion, precio) 
+            VALUES (%s, %s, %s, %s)
+        ''', (mype_id, nombre, descripcion, precio))
+        
+        conn.commit()
+        flash("✅ Producto agregado con éxito", "success")
+    except Exception as e:
+        conn.rollback()
+        print(f"Error al agregar producto: {e}")
+        flash("❌ Error al guardar el producto", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+        
+    return redirect('/dashboard_mype')
+
+@app.route('/eliminar_producto/<int:id>')
+@login_required
+def eliminar_producto(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Obtener el mype_id del usuario que tiene la sesión iniciada
+        cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
+        mype = cursor.fetchone()
+        
+        if not mype:
+            flash("Error de permisos: No se encontró perfil MYPE.", "danger")
+            return redirect('/dashboard_mype')
+
+        mype_id = mype['id']
+
+        # 2. Intentar eliminar el producto PERO validando que pertenezca a esta MYPE
+        # Esto evita que alguien borre productos ajenos cambiando el ID en la URL
+        cursor.execute('''
+            DELETE FROM productos 
+            WHERE id = %s AND mype_id = %s
+        ''', (id, mype_id))
+        
+        # rowcount nos dice cuántas filas se eliminaron realmente
+        if cursor.rowcount > 0:
+            conn.commit()
+            flash("🗑️ Producto eliminado correctamente.", "success")
+        else:
+            flash("⚠️ No se pudo eliminar: El producto no existe o no te pertenece.", "warning")
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error al eliminar producto: {e}")
+        flash("❌ Error interno al intentar eliminar el producto.", "danger")
+    finally:
+        cursor.close()
+        conn.close()
+        
     return redirect('/dashboard_mype')
 
 #Lógica del Admin
