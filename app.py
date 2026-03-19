@@ -12,9 +12,17 @@ from functools import wraps
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
-    # En PostgreSQL usamos RealDictCursor para emular el row_factory de SQLite [cite: 12, 20]
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    return conn
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    # Si la URL de Supabase usa postgres://, psycopg2 a veces prefiere postgresql://
+    if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1) #[cite: 16]
+        
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor) #[cite: 1, 16]
+        return conn
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}") #[cite: 16]
+        raise e
 
 def login_required(f):
     @wraps(f)
