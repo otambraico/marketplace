@@ -2,10 +2,8 @@ import eventlet
 eventlet.monkey_patch() # DEBE ser la primera línea, antes de cualquier otro import
 
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
-from werkzeug.security import generate_password_hash
-from werkzeug.security import check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
-import json
 import psycopg2
 from functools import wraps
 from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
@@ -14,52 +12,42 @@ from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
-from werkzeug.security import generate_password_hash
 
+# --- 1. DEFINIR LA CONEXIÓN PRIMERO ---
 def get_db_connection():
     url = os.environ.get('DATABASE_URL')
     if url and url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1) #[cite: 16]
-        
-    try:
-        # Usamos el pooler de Supabase (puerto 6543) configurado en Render
-        conn = psycopg2.connect(url, cursor_factory=RealDictCursor) #[cite: 1, 16]
-        return conn
-    except Exception as e:
-        print(f"❌ Error de conexión: {e}") #[cite: 16]
-        raise e
+        url = url.replace("postgres://", "postgresql://", 1) # [cite: 16]
+    return psycopg2.connect(url, cursor_factory=RealDictCursor) # [cite: 1, 16]
     
+# --- 2. RUTA DE EMERGENCIA (Asegúrate de que esté después de get_db_connection) ---
 @app.route('/fix_admin')
 def fix_admin():
     nueva_pass = generate_password_hash("admin1234")
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        # Actualizamos la contraseña del admin con el hash generado por TU sistema
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Actualizamos la contraseña con el hash generado en este entorno
         cursor.execute(
             "UPDATE usuarios SET password = %s WHERE email = 'admin@marketplace.com'", 
             (nueva_pass,)
         )
         conn.commit()
-        return f"✅ Password de Admin actualizada. Copia este hash si quieres guardarlo: {nueva_pass}"
-    except Exception as e:
-        return f"❌ Error: {e}"
-    finally:
         cursor.close()
         conn.close()
+        return f"✅ Password de Admin actualizada a 'admin1234'. Hash: {nueva_pass}"
+    except Exception as e:
+        return f"❌ Error: {e}"
 
-# --- 2. Inicializar después de definir la conexión ---
+# --- 3. INICIALIZACIÓN DE TABLAS ---
 with app.app_context():
     try:
-        print("🛠️ Iniciando creación de tablas en PostgreSQL...")
-        # Asegúrate que init_db en database.py use la función local o importada correctamente
-        init_db() #[cite: 32]
-        print("✅ Tablas creadas/verificadas exitosamente.")
+        init_db() # 
+        print("✅ DB inicializada")
     except Exception as e:
-        print(f"❌ Error crítico al inicializar DB: {e}")
+        print(f"Aviso DB: {e}")
 
 # Configuración de base de datos para Render
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -70,9 +58,6 @@ def login_required(f):
     return decorated_function
 
 # Inicializamos Socket.io
-# Usar una clave secreta real desde las variables de entorno
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'una-clave-muy-secreta-de-prueba')
-
 # Permitir CORS solo para tu dominio (o "*" para pruebas iniciales)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
