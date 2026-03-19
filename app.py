@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch() # DEBE ser la primera línea, antes de cualquier otro import
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
@@ -6,9 +8,23 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
 import os
+from database import init_db, get_db_connection # [cite: 1] Asegúrate de importar ambos
+
 from functools import wraps
 
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
+
+with app.app_context():
+    try:
+        print("🛠️ Iniciando creación de tablas en PostgreSQL...")
+        init_db() # [cite: 32] Llama a tu función de database.py
+        print("✅ Tablas creadas/verificadas exitosamente.")
+    except Exception as e:
+        print(f"❌ Error crítico al inicializar DB: {e}")
+
 # Configuración de base de datos para Render
+
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():

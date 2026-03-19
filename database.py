@@ -14,9 +14,9 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. TABLA MAESTRA: Categorías
+    # Crear tablas con SERIAL [cite: 14]
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS maestro_categorias (
+        CREATE TABLE IF NOT EXISTS maestro_barrios (
             id SERIAL PRIMARY KEY,
             nombre TEXT UNIQUE NOT NULL
         )
@@ -90,7 +90,8 @@ def init_db():
         ON CONFLICT (nombre) DO NOTHING
     ''', categorias)
 
-    barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',), ('Zona Residencial',), ('Barrio Comercial',)]
+    # Precarga de datos con ON CONFLICT para PostgreSQL
+    barrios = [('Sector Norte',), ('Sector Sur',), ('Centro Histórico',)]
     cursor.executemany('''
         INSERT INTO maestro_barrios (nombre) VALUES (%s) 
         ON CONFLICT (nombre) DO NOTHING
