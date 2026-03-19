@@ -6,39 +6,38 @@ from werkzeug.security import check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import json
 import psycopg2
+from functools import wraps
 from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
 import os
-from database import init_db, get_db_connection # [cite: 1] Asegúrate de importar ambos
-
-from functools import wraps
+from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
 
+def get_db_connection():
+    url = os.environ.get('DATABASE_URL')
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1) #[cite: 16]
+        
+    try:
+        # Usamos el pooler de Supabase (puerto 6543) configurado en Render
+        conn = psycopg2.connect(url, cursor_factory=RealDictCursor) #[cite: 1, 16]
+        return conn
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}") #[cite: 16]
+        raise e
+    
+# --- 2. Inicializar después de definir la conexión ---
 with app.app_context():
     try:
         print("🛠️ Iniciando creación de tablas en PostgreSQL...")
-        init_db() # [cite: 32] Llama a tu función de database.py
+        # Asegúrate que init_db en database.py use la función local o importada correctamente
+        init_db() #[cite: 32]
         print("✅ Tablas creadas/verificadas exitosamente.")
     except Exception as e:
         print(f"❌ Error crítico al inicializar DB: {e}")
 
 # Configuración de base de datos para Render
-
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-def get_db_connection():
-    DATABASE_URL = os.environ.get('DATABASE_URL')
-    # Si la URL de Supabase usa postgres://, psycopg2 a veces prefiere postgresql://
-    if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1) #[cite: 16]
-        
-    try:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor) #[cite: 1, 16]
-        return conn
-    except Exception as e:
-        print(f"❌ Error de conexión: {e}") #[cite: 16]
-        raise e
 
 def login_required(f):
     @wraps(f)
