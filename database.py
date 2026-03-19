@@ -83,9 +83,14 @@ def init_db():
     ''')
 
     conn.commit()
+    cursor.close()
+    conn.close() # CERRAMOS para asegurar que Postgres guarde los cambios
 
-    # --- PRECARGA DE DATOS ---
-    # En Postgres usamos "ON CONFLICT" en lugar de "INSERT OR IGNORE"
+    # --- FASE 2: POBLACIÓN DE DATOS ---
+    # Abrimos una conexión NUEVA para que ya "vea" las tablas creadas
+    conn = get_db_connection() #[cite: 16]
+    cursor = conn.cursor()
+    
     categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
     cursor.executemany('''
         INSERT INTO maestro_categorias (nombre) VALUES (%s) 

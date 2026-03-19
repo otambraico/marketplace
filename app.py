@@ -1,5 +1,6 @@
 import eventlet
 eventlet.monkey_patch() # DEBE ser la primera línea, antes de cualquier otro import
+
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
@@ -156,8 +157,11 @@ def registro():
         password = generate_password_hash(request.form['password'])
         rol = request.form['rol']
         barrio_id = request.form.get('barrio_id')
+        barrio_id = int(barrio_id) if barrio_id and barrio_id != "" else None
         lat = request.form.get('latitud')
+        lat = float(lat) if lat and lat != "" else None
         lng = request.form.get('longitud')
+        lng = float(lng) if lng and lng != "" else None
         
         try:
             # 2. Insertar en tabla usuarios (Siempre se ejecuta)
@@ -445,6 +449,7 @@ def eliminar_barrio(id):
                 conn.commit()
                 flash("Barrio eliminado con éxito.", "success")
         except Exception as e:
+            conn.rollback()
             flash(f"Error al eliminar: {e}", "danger")
         finally:
             cursor.close()
