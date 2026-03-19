@@ -10,6 +10,8 @@ from functools import wraps
 from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
 import os
 from database import init_db # [cite: 1] Asegúrate de importar ambos
+import eventlet
+eventlet.monkey_patch()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')

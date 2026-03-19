@@ -82,6 +82,8 @@ def init_db():
         )
     ''')
 
+    conn.commit()
+
     # --- PRECARGA DE DATOS ---
     # En Postgres usamos "ON CONFLICT" en lugar de "INSERT OR IGNORE"
     categorias = [('Alimentos',), ('Ropa y Calzado',), ('Servicios Técnicos',), ('Hogar',), ('Salud',)]
