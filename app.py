@@ -331,7 +331,7 @@ def admin_panel():
         SELECT b.id, b.nombre, COUNT(u.id) as total_usuarios
         FROM maestro_barrios b
         LEFT JOIN usuarios u ON b.id = u.barrio_id
-        GROUP BY b.id
+        GROUP BY b.id, b.nombre
     ''')
     barrios = cursor.fetchall()
 
@@ -345,11 +345,9 @@ def admin_panel():
     cursor.execute("SELECT count(*) as total FROM productos")
     total_productos = cursor.fetchone()['total']
 
-    # --- LISTADOS ---
     # Usuarios registrados
     # cursor.execute("SELECT id, nombre, email, rol, estado FROM usuarios")
     # usuarios = cursor.fetchall()
-    
     # Categorías actuales
     cursor.execute("SELECT * FROM maestro_categorias")
     categorias = cursor.fetchall()

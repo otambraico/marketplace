@@ -74,7 +74,7 @@
                                     </span>
                                     <div class="small mt-1 text-muted">{{ user.nombre_barrio if user.nombre_barrio else 'N/A' }}</div>
                                 </td>
-                                <td class="small">{{ user.fecha_registro[:10] if user.fecha_registro else 'S/D' }}</td>
+                                <td class="small">{{ user.fecha_registro.strftime('%Y-%m-%d') if user.fecha_registro else 'S/D' }}</td>
                                 <td>
                                     <span class="badge rounded-pill {% if user.estado == 'activo' %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ user.estado|capitalize }}
