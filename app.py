@@ -13,9 +13,22 @@ import os
 from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
-
+app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
 from werkzeug.security import generate_password_hash
 
+def get_db_connection():
+    url = os.environ.get('DATABASE_URL')
+    if url and url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1) #[cite: 16]
+        
+    try:
+        # Usamos el pooler de Supabase (puerto 6543) configurado en Render
+        conn = psycopg2.connect(url, cursor_factory=RealDictCursor) #[cite: 1, 16]
+        return conn
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}") #[cite: 16]
+        raise e
+    
 @app.route('/fix_admin')
 def fix_admin():
     nueva_pass = generate_password_hash("admin1234")
@@ -35,7 +48,6 @@ def fix_admin():
         cursor.close()
         conn.close()
 
-app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
 # --- 2. Inicializar después de definir la conexión ---
 with app.app_context():
     try:
@@ -45,19 +57,6 @@ with app.app_context():
         print("✅ Tablas creadas/verificadas exitosamente.")
     except Exception as e:
         print(f"❌ Error crítico al inicializar DB: {e}")
-
-def get_db_connection():
-    url = os.environ.get('DATABASE_URL')
-    if url and url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1) #[cite: 16]
-        
-    try:
-        # Usamos el pooler de Supabase (puerto 6543) configurado en Render
-        conn = psycopg2.connect(url, cursor_factory=RealDictCursor) #[cite: 1, 16]
-        return conn
-    except Exception as e:
-        print(f"❌ Error de conexión: {e}") #[cite: 16]
-        raise e
 
 # Configuración de base de datos para Render
 
@@ -69,9 +68,6 @@ def login_required(f):
             return redirect('/login')
         return f(*args, **kwargs)
     return decorated_function
-
-app = Flask(__name__)
-app.secret_key = 'tu_clave_secreta_para_flash' # Obligatorio para usar flash()
 
 # Inicializamos Socket.io
 # Usar una clave secreta real desde las variables de entorno
