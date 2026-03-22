@@ -6,9 +6,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Forzamos que el mapa tenga visibilidad y altura */
-        #map {
+        #map { 
             height: calc(100vh - 65px); /* Resta el espacio de la barra inferior en móvil */
-            width: 100%;
+            min-height: 80vh; 
+            width: 100%; 
+            display: block; /* Asegura que no sea inline */
+            z-index: 1; 
         }
         .info-header { padding: 20px; background: white; text-align: center; border-bottom: 1px solid #ddd; }
     </style>
