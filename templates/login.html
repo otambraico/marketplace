@@ -11,25 +11,24 @@
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <h2 style="margin-top:0;">Iniciar Sesión</h2>
-        
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            {% for m in messages %}
-              <div class="flash">{{ m }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <form method="POST">
-            <input type="email" name="email" placeholder="Tu correo electrónico" required>
-            <input type="password" name="password" placeholder="Tu contraseña" required>
-            <button type="submit">Entrar al Marketplace</button>
-        </form>
-        <p style="text-align:center; font-size: 14px; margin-top: 20px;">
-            ¿No tienes cuenta? <a href="/registro">Regístrate aquí</a>
-        </p>
+    <div class="login-container" style="max-width: 400px; margin: 50px auto; padding: 20px;">
+        <div class="card shadow-sm p-4">
+            <h2 class="text-center mb-4">🏠 Mi Barrio</h2>
+            <form action="/login" method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Correo Electrónico</label>
+                    <input type="email" name="email" class="form-control form-control-lg" placeholder="ejemplo@correo.com" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Contraseña</label>
+                    <input type="password" name="password" class="form-control form-control-lg" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Ingresar</button>
+            </form>
+            <p class="text-center mt-4">
+                ¿No tienes cuenta? <a href="/registro">Regístrate aquí</a>
+            </p>
+        </div>
     </div>
 </body>
 </html>
