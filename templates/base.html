@@ -27,7 +27,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-
+    {% if request.path != '/login' and request.path != '/registro' %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary d-none d-md-block navbar-desktop">
         <div class="container">
             <a class="navbar-brand" href="/">🏠 Mi Barrio</a>
@@ -42,9 +42,14 @@
             </div>
         </div>
     </nav>
+    {% endif %}
 
-    <div class="container {% if request.path == '/' %}main-container-map{% else %}mt-4{% endif %}">
-        {% block content %}{% endblock %}
+    <div class="d-flex">
+        <main class="flex-grow-1">
+            <div class="container {% if request.path == '/' %}p-0 m-0 mw-100{% else %}mt-4{% endif %}">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
     </div>
 
     <nav class="bottom-nav d-flex d-md-none">
