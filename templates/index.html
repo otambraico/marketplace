@@ -6,15 +6,26 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Forzamos que el mapa tenga visibilidad y altura */
-        #map { 
-            height: calc(100vh - 65px); /* Resta el espacio de la barra inferior en móvil */
-            min-height: 80vh; 
-            width: 100%; 
-            display: block; /* Asegura que no sea inline */
-            z-index: 1; 
-        }
+        #map {
+                height: calc(100vh - 56px); /* 56px es la altura estándar del navbar de Bootstrap */
+                width: 100%;
+                z-index: 1;
+            }
+
+            /* En móviles, ajustamos para la barra inferior */
+            @media (max-width: 768px) {
+                #map {
+                    height: calc(100vh - 65px); 
+                }
+            }
         .info-header { padding: 20px; background: white; text-align: center; border-bottom: 1px solid #ddd; }
     </style>
+    <script>
+        // Esto fuerza a Leaflet a recalcular el tamaño del mapa y rellenar los cuadros
+        setTimeout(function(){ 
+            map.invalidateSize(); 
+        }, 500);
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -26,6 +37,19 @@
     <div id="map" class="shadow-sm"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Forzar el re-calculo del tamaño del mapa tras la carga inicial
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                map.invalidateSize();
+            }, 500);
+        });
+
+        // También al cambiar el tamaño de la ventana (rotación de celular)
+        window.addEventListener('resize', function() {
+            map.invalidateSize();
+        });
+    </script>
     <script>
         // 1. Definimos irAlChat de forma global para que el botón del popup la vea
         function irAlChat(id) {
