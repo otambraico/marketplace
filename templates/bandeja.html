@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h4 class="mb-4">Mis Conversaciones</h4>
+    
+    <div class="list-group shadow-sm">
+        {% for c in conversaciones %}
+        <a href="/chat/{{ c.contacto_id }}" class="list-group-item list-group-item-action p-3 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                    {{ c.nombre[0] | upper }}
+                </div>
+                <div>
+                    <h6 class="mb-0 fw-bold">{{ c.nombre }}</h6>
+                    <p class="mb-0 text-muted small text-truncate" style="max-width: 200px;">
+                        {{ c.contenido }}
+                    </p>
+                </div>
+            </div>
+            
+            <div class="text-end">
+                <small class="text-muted d-block mb-1">{{ c.fecha.strftime('%d/%m') if c.fecha else '' }}</small>
+                {% if c.pendientes > 0 %}
+                <span class="badge rounded-pill bg-success">{{ c.pendientes }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% else %}
+        <div class="text-center p-5">
+            <p class="text-muted">No tienes mensajes aún.</p>
+            <a href="/" class="btn btn-outline-primary">Explorar el mapa</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

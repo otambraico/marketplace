@@ -64,33 +64,73 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # Evento cuando un usuario abre cualquier chat
 @socketio.on('join')
 def on_join(data):
-    # El usuario se une a una sala con su propio ID
-    # Esto permite que el servidor le envíe mensajes privados
-    room = str(session.get('user_id'))
-    join_room(room)
-    print(f"📡 Usuario {session.get('user_nombre')} entró a su sala privada: {room}")
+    user_id = session.get('user_id')
+    if user_id:
+        join_room(f"user_{user_id}")
+        print(f"✅ Usuario {user_id} unido a su sala.")
 
 @socketio.on('enviar_mensaje')
-def handle_message(data):
+def handle_mensaje(data):
     emisor_id = session.get('user_id')
-    receptor_id = data['receptor_id']
-    contenido = data['mensaje']
+    receptor_id = data.get('receptor_id')
+    contenido = data.get('mensaje')
 
-    # Persistencia
+    if not emisor_id or not receptor_id or not contenido:
+        return
+
+    # Persistencia en Supabase/PostgreSQL
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+        "INSERT INTO mensajes (emisor_id, receptor_id, contenido, leido) VALUES (%s, %s, %s, FALSE) RETURNING id",
         (emisor_id, receptor_id, contenido)
     )
     conn.commit()
     cursor.close()
     conn.close()
 
-    # Broadcast (Emitimos con los nombres que espera el JS)
-    payload = {'emisor_id': emisor_id, 'mensaje': contenido}
+    payload = {
+        'emisor_id': emisor_id,
+        'mensaje': contenido,
+        'fecha': "Ahora"
+    }
+
+    # Notificar a ambos (Emisor y Receptor)
     emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
     emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
+
+@app.route('/mensajes')
+@login_required
+def bandeja_entrada():
+    user_id = session.get('user_id')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query avanzada: Obtiene el último mensaje de cada conversación y cuenta no leídos
+    query = """
+    SELECT DISTINCT ON (sub.contacto_id)
+        sub.contacto_id,
+        u.nombre,
+        sub.contenido,
+        sub.fecha,
+        (SELECT COUNT(*) FROM mensajes WHERE receptor_id = %s AND emisor_id = sub.contacto_id AND leido = FALSE) as pendientes
+    FROM (
+        SELECT 
+            CASE WHEN emisor_id = %s THEN receptor_id ELSE emisor_id END as contacto_id,
+            contenido, fecha
+        FROM mensajes
+        WHERE emisor_id = %s OR receptor_id = %s
+        ORDER BY fecha DESC
+    ) sub
+    JOIN usuarios u ON u.id = sub.contacto_id
+    ORDER BY sub.contacto_id, sub.fecha DESC
+    """
+    cursor.execute(query, (user_id, user_id, user_id, user_id))
+    conversaciones = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return render_template('bandeja.html', conversaciones=conversaciones)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -501,45 +541,7 @@ def eliminar_barrio(id):
             conn.close()
     return redirect('/admin')
 
-# ---------------------------------------------------------
-# EVENTOS DE SOCKET.IO (Lógica del Chat)
-# ---------------------------------------------------------
-
-@socketio.on('connect')
-def handle_connect():
-    print(f"✅ Usuario conectado: {session.get('user_nombre')}")
-
-@socketio.on('enviar_mensaje')
-def handle_mensaje(data):
-    emisor_id = session.get('user_id')
-    receptor_id = data['receptor_id']
-    contenido = data['contenido']
-
-    # 1. Persistencia (Responsabilidad Única: Guardar)
-    guardar_mensaje_db(emisor_id, receptor_id, contenido)
-
-    # 2. Notificación en Tiempo Real
-    emit('nuevo_mensaje', {
-        'remitente_id': emisor_id,
-        'mensaje': contenido
-    }, room=f"user_{receptor_id}")
-    
-    # También enviarlo al remitente para que lo vea en su pantalla
-    emit('nuevo_mensaje', {
-        'remitente_id': emisor_id,
-        'mensaje': contenido
-    }, room=f"user_{emisor_id}")
-
-def guardar_mensaje_db(remitente, destinatario, texto):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO mensajes (emisor_id, receptor-id, contenido) VALUES (%s, %s, %s)",
-        (remitente, destinatario, texto)
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
+#Chat
 
 @app.route('/chat/<int:receptor_id>')
 @login_required
