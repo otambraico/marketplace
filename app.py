@@ -58,46 +58,46 @@ def login_required(f):
     return decorated_function
 
 # Inicializamos Socket.io
-# Permitir CORS solo para tu dominio (o "*" para pruebas iniciales)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Inicialización (Asegúrate de tener esto)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Evento cuando un usuario abre cualquier chat
 @socketio.on('join')
 def on_join(data):
+    """SRP: Responsabilidad de conectar al usuario a su canal privado"""
     user_id = session.get('user_id')
     if user_id:
-        join_room(f"user_{user_id}")
-        print(f"✅ Usuario {user_id} unido a su sala.")
+        room = f"user_{user_id}"
+        join_room(room)
+        print(f"📡 Usuario {user_id} conectado a sala: {room}")
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
+    """SRP: Gestión de envío y persistencia"""
     emisor_id = session.get('user_id')
     receptor_id = data.get('receptor_id')
     contenido = data.get('mensaje')
 
-    if not emisor_id or not receptor_id or not contenido:
-        return
+    if emisor_id and receptor_id and contenido:
+        # 1. Persistencia en DB (Lo que llenará Supabase)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+            (emisor_id, receptor_id, contenido)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
 
-    # Persistencia en Supabase/PostgreSQL
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO mensajes (emisor_id, receptor_id, contenido, leido) VALUES (%s, %s, %s, FALSE) RETURNING id",
-        (emisor_id, receptor_id, contenido)
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    payload = {
-        'emisor_id': emisor_id,
-        'mensaje': contenido,
-        'fecha': "Ahora"
-    }
-
-    # Notificar a ambos (Emisor y Receptor)
-    emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
-    emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
+        # 2. Emisión en Tiempo Real
+        payload = {
+            'emisor_id': emisor_id,
+            'receptor_id': receptor_id,
+            'mensaje': contenido
+        }
+        # Enviar al receptor y al emisor (para feedback visual)
+        emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
+        emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
 
 @app.route('/mensajes')
 @login_required

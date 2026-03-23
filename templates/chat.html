@@ -35,16 +35,13 @@
 
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
-    // 1. Inicialización de la conexión
-    const socket = io();
-    const chatBox = document.getElementById('chat-box');
-    const receptorId = {{ contacto.id }};
+    const socket = io(); // Conexión automática
     const miId = {{ session.user_id }};
 
-    // SRP: Función única para desplazar el scroll
-    const scrollToBottom = () => {
-        chatBox.scrollTop = chatBox.scrollHeight;
-    };
+    // CRÍTICO: Avisar al servidor que estamos listos para recibir
+    socket.on('connect', () => {
+        socket.emit('join', { user_id: miId });
+    });
 
     // 2. Evento de conexión (SOLID: Handshake inicial)
     socket.on('connect', () => {
@@ -53,32 +50,26 @@
         socket.emit('join', { user_id: miId });
     });
 
-    // 3. Manejo del Envío (SRP: Captura y emisión)
+    // Envío de mensaje
     document.getElementById('chat-form').onsubmit = (e) => {
         e.preventDefault();
         const input = document.getElementById('mensaje-input');
-        const mensajeTexto = input.value.trim();
-
-        if (mensajeTexto) {
+        if (input.value.trim()) {
             socket.emit('enviar_mensaje', {
-                receptor_id: receptorId,
-                mensaje: mensajeTexto
+                receptor_id: {{ contacto.id }},
+                mensaje: input.value
             });
             input.value = '';
         }
     };
 
-    // 4. Recepción de Mensajes (Interface Segregation: Solo procesamos datos relevantes)
+    // Escucha de mensaje
     socket.on('nuevo_mensaje', (data) => {
-        // Validación de contexto: Solo mostrar si pertenece a esta conversación
-        const perteneceAEstaCharla = 
-            (data.emisor_id == miId && data.receptor_id == receptorId) ||
-            (data.emisor_id == receptorId && data.receptor_id == miId);
-
-        if (!perteneceAEstaCharla) return;
-
-        renderizarBurbuja(data);
-        scrollToBottom();
+        // Solo renderizar si el mensaje pertenece a esta conversación específica
+        if (data.emisor_id == {{ contacto.id }} || data.emisor_id == miId) {
+            renderizarBurbuja(data); // Tu función de renderizado
+            scrollToBottom();
+        }
     });
 
     // 5. Función de Renderizado (SRP: Responsabilidad visual únicamente)
