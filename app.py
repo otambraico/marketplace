@@ -285,28 +285,36 @@ def api_mypes():
 @app.route('/dashboard_mype')
 @login_required
 def dashboard_mype():
-    # 1. Validación de seguridad
-    if session.get('user_rol') != 'mype':
-        flash("Acceso denegado: Esta área es solo para negocios.")
-        return redirect('/')
-    
-    # 2. Conexión y consulta (TODO esto debe estar indentado dentro de la función)
+    user_id = session.get('user_id')
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Obtener datos de la MYPE
-    cursor.execute("SELECT * FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
+    
+    # 1. Obtener datos de la MYPE (Responsabilidad: Perfil)
+    cursor.execute("SELECT * FROM perfiles_mype WHERE usuario_id = %s", (user_id,))
     mype = cursor.fetchone()
     
-    # Obtener productos (Aquí es donde se generan los datos para el loop de la tabla)
-    cursor.execute("SELECT * FROM productos WHERE mype_id = %s ORDER BY fecha_creacion DESC", (mype['id'],))
+    if not mype:
+        flash("Perfil MYPE no encontrado.", "warning")
+        return redirect('/')
+
+    # 2. Obtener productos (Responsabilidad: Inventario)
+    cursor.execute("SELECT * FROM productos WHERE mype_id = %s ORDER BY id DESC", (mype['id'],))
     productos = cursor.fetchall()
+
+    # 3. CONTAR MENSAJES PENDIENTES (Responsabilidad: Notificaciones)
+    # Esta es la variable que falta en tu log
+    cursor.execute("SELECT COUNT(*) as total FROM mensajes WHERE receptor_id = %s AND leido = FALSE", (user_id,))
+    res_pendientes = cursor.fetchone()
+    mensajes_pendientes = res_pendientes['total'] if res_pendientes else 0
     
     cursor.close()
     conn.close()
     
-    # 3. Renderizado único al final con todos los datos
-    return render_template('dashboard_mype.html', mype=mype, productos=productos)
+    # IMPORTANTE: Enviamos 'mensajes_pendientes' a la plantilla
+    return render_template('dashboard_mype.html', 
+                           mype=mype, 
+                           productos=productos, 
+                           mensajes_pendientes=mensajes_pendientes)
 
 @app.route('/agregar_producto', methods=['POST'])
 @login_required
