@@ -7,84 +7,33 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <style>
-        /* Estilos para la Barra Inferior (Solo Móvil) */
+        body { background-color: #f8f9fa; }
         .bottom-nav {
-            display: none; /* Oculto en escritorio */
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            left: 0;
-            right: 0;
-            height: 65px;
-            background-color: #ffffff;
-            border-top: 1px solid #dee2e6;
-            z-index: 1000;
-            border-top: 1px solid #ddd;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: none; position: fixed; bottom: 0; width: 100%; height: 65px;
+            background: white; border-top: 1px solid #dee2e6; z-index: 1000;
         }
-
         .nav-item-mobile {
-            flex: 1;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 12px;
+            flex: 1; text-align: center; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: #6c757d; text-decoration: none; font-size: 11px;
         }
-
-        .nav-item-mobile.active {
-            color: #007bff;
-            font-weight: bold;
-        }
-
-        .nav-item-mobile i, .nav-item-mobile span.icon {
-            font-size: 20px;
-            margin-bottom: 2px;
-        }
-
-        /* Ajuste para que el contenido no quede tapado por la barra */
+        .nav-item-mobile.active { color: #007bff; font-weight: bold; }
+        
         @media (max-width: 768px) {
             .bottom-nav { display: flex; }
             body { padding-bottom: 70px; }
-            .navbar-desktop { display: none !important; } /* Ocultar navbar superior en móvil */
+            .navbar-desktop { display: none !important; }
         }
-        #map {
-                height: calc(100vh - 56px); /* Altura total menos el navbar superior */
-                width: 100%;
-                display: block;
-            }
-
-            @media (max-width: 768px) {
-                #map {
-                    height: calc(100vh - 65px); /* Altura menos la barra inferior móvil */
-                }
-            }
-        html, body {
-                height: 100%;
-                margin: 0;
-                padding: 0;
-                overflow-x: hidden;
-            }
-
-            /* Evita que el contenido principal sea tapado por la barra inferior en móvil */
-            @media (max-width: 768px) {
-                body {
-                    padding-bottom: 65px; 
-                }
-            }
     </style>
+    {% block head %}{% endblock %}
 </head>
 <body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary d-none d-md-block">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary d-none d-md-block navbar-desktop">
         <div class="container">
             <a class="navbar-brand" href="/">🏠 Mi Barrio</a>
             <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Mapa</a>
                 {% if session.user_id %}
-                    <a class="nav-link" href="/">Mapa</a>
                     <a class="nav-link" href="/dashboard_mype">Mi Negocio</a>
                     <a class="nav-link text-warning" href="/logout">Salir</a>
                 {% else %}
@@ -94,20 +43,18 @@
         </div>
     </nav>
 
-    <div class="container mt-3">
+    <div class="container {% if request.path == '/' %}main-container-map{% else %}mt-4{% endif %}">
         {% block content %}{% endblock %}
     </div>
 
     <nav class="bottom-nav d-flex d-md-none">
         <a href="/" class="nav-item-mobile {% if request.path == '/' %}active{% endif %}">
-            <span class="icon">📍</span>
-            <span>Mapa</span>
+            <span class="icon">📍</span><span>Mapa</span>
         </a>
         
         {% if session.user_rol == 'mype' %}
         <a href="/dashboard_mype" class="nav-item-mobile {% if request.path == '/dashboard_mype' %}active{% endif %}">
-            <span class="icon">📦</span>
-            <span>Mis Ventas</span>
+            <span class="icon">📦</span><span>Ventas</span>
         </a>
         {% endif %}
 
