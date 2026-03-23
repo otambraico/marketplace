@@ -61,15 +61,16 @@ def init_db():
 
     # 6. TABLA: Mensajes (Chat)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS mensajes (
-            id SERIAL PRIMARY KEY,
-            emisor_id INTEGER REFERENCES usuarios(id),
-            receptor_id INTEGER REFERENCES usuarios(id),
-            contenido TEXT NOT NULL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    CREATE TABLE IF NOT EXISTS mensajes (
+        id SERIAL PRIMARY KEY,
+        emisor_id INTEGER REFERENCES usuarios(id),
+        receptor_id INTEGER REFERENCES usuarios(id),
+        contenido TEXT NOT NULL,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        leido BOOLEAN DEFAULT FALSE
         )
     ''')
-
+    conn.commit()
     conn.commit()
     cursor.close()
     conn.close() # CERRAMOS para asegurar que Postgres guarde los cambios
