@@ -19,12 +19,16 @@
         <h2>{{ mype.nombre_comercial }}</h2>
         <hr>
         <p>🏠 <a href="/" style="color:white; text-decoration:none;">Ver mi tienda en mapa</a></p>
-        <p>📦 Mis Productos</p>
-        <p>💬 Mensajes</p>
-        <p>⚙️ Configuración</p>
+        <p>📦 <a href="/dashboard_mype" style="color:white; text-decoration:none;">Mis Productos</a></p>
+        <p>💬 <a href="/mensajes" style="color:white; text-decoration:none;">
+            Mensajes 
+            {% if mensajes_pendientes > 0 %}
+                <span class="badge bg-danger">{{ mensajes_pendientes }}</span>
+            {% endif %}
+        </a></p>
         <br>
         <a href="/logout" style="color:#ff6b6b;">Cerrar Sesión</a>
-    </div>
+    </div>  
 
     <div class="main-content">
         <h1>Gestión de Productos</h1>

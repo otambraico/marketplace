@@ -127,9 +127,9 @@ def bandeja_entrada():
     """
     cursor.execute(query, (user_id, user_id, user_id, user_id))
     conversaciones = cursor.fetchall()
+
     cursor.close()
     conn.close()
-
     return render_template('bandeja.html', conversaciones=conversaciones)
 
 @app.route('/login', methods=['GET', 'POST'])

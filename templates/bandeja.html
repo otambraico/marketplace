@@ -1,36 +1,33 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <h4 class="mb-4">Mis Conversaciones</h4>
+<div class="container mt-4" style="max-width: 600px;">
+    <h3 class="mb-4">💬 Mis Conversaciones</h3>
     
     <div class="list-group shadow-sm">
         {% for c in conversaciones %}
-        <a href="/chat/{{ c.contacto_id }}" class="list-group-item list-group-item-action p-3 d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                    {{ c.nombre[0] | upper }}
-                </div>
-                <div>
+        <a href="/chat/{{ c.contacto_id }}" class="list-group-item list-group-item-action d-flex align-items-center p-3">
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-weight: bold;">
+                {{ c.nombre[0] | upper }}
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between">
                     <h6 class="mb-0 fw-bold">{{ c.nombre }}</h6>
-                    <p class="mb-0 text-muted small text-truncate" style="max-width: 200px;">
-                        {{ c.contenido }}
-                    </p>
+                    <small class="text-muted">{{ c.fecha.strftime('%H:%M') if c.fecha else '' }}</small>
                 </div>
+                <p class="mb-0 text-muted small text-truncate" style="max-width: 250px;">
+                    {{ c.contenido }}
+                </p>
             </div>
-            
-            <div class="text-end">
-                <small class="text-muted d-block mb-1">{{ c.fecha.strftime('%d/%m') if c.fecha else '' }}</small>
-                {% if c.pendientes > 0 %}
-                <span class="badge rounded-pill bg-success">{{ c.pendientes }}</span>
-                {% endif %}
-            </div>
+            {% if c.pendientes > 0 %}
+                <span class="badge rounded-pill bg-success ms-2">{{ c.pendientes }}</span>
+            {% endif %}
         </a>
         {% else %}
-        <div class="text-center p-5">
-            <p class="text-muted">No tienes mensajes aún.</p>
-            <a href="/" class="btn btn-outline-primary">Explorar el mapa</a>
-        </div>
+            <div class="text-center p-5 bg-white rounded shadow-sm">
+                <p class="text-muted">Aún no tienes mensajes.</p>
+                <a href="/" class="btn btn-primary btn-sm">Explorar Negocios</a>
+            </div>
         {% endfor %}
     </div>
 </div>
