@@ -1,63 +1,50 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="chat-wrapper d-flex flex-column" style="height: calc(100vh - 150px);">
-    <div class="chat-header p-3 bg-white border-bottom d-flex align-items-center">
-        <a href="/mensajes" class="text-decoration-none me-3">⬅️</a>
-        <div class="user-info">
+<div class="chat-wrapper d-flex flex-column" style="height: calc(100vh - 160px);">
+    <div class="p-3 bg-white border-bottom d-flex align-items-center">
+        <a href="/" class="text-decoration-none me-3">⬅️</a>
+        <div>
             <h6 class="mb-0 fw-bold">{{ contacto.nombre }}</h6>
             <small class="text-success">● En línea</small>
         </div>
     </div>
 
-    <div id="chat-box" class="flex-grow-1 p-3 overflow-auto" style="background-color: #f0f2f5;">
-        {% for m in mensajes %}
-            <div class="d-flex {% if m.remitente_id == session.user_id %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">
-                <div class="message-bubble p-3 shadow-sm" 
-                     style="max-width: 75%; border-radius: 15px; 
-                            {% if m.remitente_id == session.user_id %}
-                                background-color: #dcf8c6; border-bottom-right-radius: 2px;
-                            {% else %}
-                                background-color: #ffffff; border-bottom-left-radius: 2px;
-                            {% endif %}">
-                    <p class="mb-1">{{ m.contenido }}</p>
+    <div id="chat-box" class="flex-grow-1 p-3 overflow-auto" style="background-color: #f8f9fa;">
+        {% for m in historial %}
+            <div class="d-flex {% if m.emisor_id == session.user_id %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">
+                <div class="p-2 px-3 shadow-sm" 
+                     style="max-width: 80%; border-radius: 15px; 
+                            background-color: {% if m.emisor_id == session.user_id %}#dcf8c6{% else %}#ffffff{% endif %};">
+                    <p class="mb-0">{{ m.contenido }}</p>
                     <small class="text-muted d-block text-end" style="font-size: 10px;">
-                        {{ m.fecha_envio.strftime('%H:%M') }}
+                        {{ m.fecha.strftime('%H:%M') if m.fecha else '' }}
                     </small>
                 </div>
             </div>
         {% endfor %}
     </div>
 
-    <div class="chat-input p-3 bg-white border-top">
+    <div class="p-3 bg-white border-top">
         <form id="chat-form" class="d-flex gap-2">
-            <input type="text" id="mensaje-input" class="form-control border-0 bg-light py-2" 
-                   placeholder="Escribe un mensaje..." autocomplete="off">
-            <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px;">
-                ✈️
-            </button>
+            <input type="text" id="mensaje-input" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off">
+            <button type="submit" class="btn btn-primary">Enviar</button>
         </form>
     </div>
 </div>
-
-
 
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
     const socket = io();
     const chatBox = document.getElementById('chat-box');
-    const chatForm = document.getElementById('chat-form');
-    
-    // Auto-scroll al final
     chatBox.scrollTop = chatBox.scrollHeight;
 
-    chatForm.onsubmit = (e) => {
+    document.getElementById('chat-form').onsubmit = (e) => {
         e.preventDefault();
         const input = document.getElementById('mensaje-input');
         if (input.value.trim()) {
-            // Siguiendo SOLID, el cliente solo envía datos, no lógica
             socket.emit('enviar_mensaje', {
-                destinatario_id: {{ contacto.id }},
+                receptor_id: {{ contacto.id }},
                 mensaje: input.value
             });
             input.value = '';
@@ -65,15 +52,13 @@
     };
 
     socket.on('nuevo_mensaje', (data) => {
-        // Lógica para añadir la burbuja dinámicamente
+        // Lógica de renderizado de nueva burbuja (SRP: Solo visual)
         const div = document.createElement('div');
-        const esMio = data.remitente_id == {{ session.user_id }};
+        const esMio = data.emisor_id == {{ session.user_id }};
         div.className = `d-flex ${esMio ? 'justify-content-end' : 'justify-content-start'} mb-3`;
-        div.innerHTML = `
-            <div class="message-bubble p-3 shadow-sm" style="max-width: 75%; border-radius: 15px; background-color: ${esMio ? '#dcf8c6' : '#ffffff'};">
-                <p class="mb-1">${data.mensaje}</p>
-            </div>
-        `;
+        div.innerHTML = `<div class="p-2 px-3 shadow-sm" style="max-width: 80%; border-radius: 15px; background-color: ${esMio ? '#dcf8c6' : '#ffffff'};">
+            <p class="mb-0">${data.mensaje}</p>
+        </div>`;
         chatBox.appendChild(div);
         chatBox.scrollTop = chatBox.scrollHeight;
     });

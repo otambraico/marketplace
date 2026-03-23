@@ -73,35 +73,24 @@ def on_join(data):
 @socketio.on('enviar_mensaje')
 def handle_message(data):
     emisor_id = session.get('user_id')
-    receptor_id = data['receptor_id'] # 
-    mensaje = data['mensaje']
-    emisor_nombre = session.get('user_nombre')
+    receptor_id = data['receptor_id']
+    contenido = data['mensaje']
 
-    # 1. Guardar en PostgreSQL
+    # Persistencia
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
-        VALUES (%s, %s, %s)
-    ''', (emisor_id, receptor_id, mensaje)) # 
+    cursor.execute(
+        "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+        (emisor_id, receptor_id, contenido)
+    )
     conn.commit()
     cursor.close()
     conn.close()
 
-    # 2. Envío privado por salas (Rooms)
-    # Enviamos al receptor [cite: 4]
-    emit('nuevo_mensaje', {
-        'msg': mensaje,
-        'de': emisor_nombre,
-        'de_id': emisor_id
-    }, room=str(receptor_id))
-
-    # Enviamos al emisor para feedback inmediato [cite: 5]
-    emit('nuevo_mensaje', {
-        'msg': mensaje,
-        'de': emisor_nombre,
-        'de_id': emisor_id
-    }, room=str(emisor_id))
+    # Broadcast (Emitimos con los nombres que espera el JS)
+    payload = {'emisor_id': emisor_id, 'mensaje': contenido}
+    emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
+    emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -562,29 +551,27 @@ def chat_personal(receptor_id):
     cursor = conn.cursor()
     
     cursor.execute("SELECT nombre FROM usuarios WHERE id = %s", (receptor_id,))
-    receptor = cursor.fetchone()
+    contacto = cursor.fetchone()
     
-    if not receptor:
-        cursor.close()
-        conn.close()
+    if not contacto:
+        
         flash("El usuario no existe.", "warning")
         return redirect('/')
 
     # 2. Cargar historial de mensajes entre estos dos usuarios
     cursor.execute('''
-        SELECT m.*, u.nombre as emisor_nombre 
-        FROM mensajes m
-        JOIN usuarios u ON m.emisor_id = u.id
-        WHERE (m.emisor_id = %s AND m.receptor_id = %s) 
-           OR (m.emisor_id = %s AND m.receptor_id = %s)
-        ORDER BY m.fecha ASC
+        SELECT * FROM mensajes 
+        WHERE (emisor_id = %s AND receptor_id = %s) 
+           OR (emisor_id = %s AND receptor_id = %s)
+        ORDER BY fecha ASC
     ''', (emisor_id, receptor_id, receptor_id, emisor_id))
-    
     historial = cursor.fetchall()
+    
     cursor.close()
     conn.close()
 
-    return render_template('chat.html', receptor=receptor, receptor_id=receptor_id, historial=historial)
+    # IMPORTANTE: Pasamos 'contacto' e 'historial' para que coincidan con el HTML
+    return render_template('chat.html', contacto=contacto, historial=historial)
 
 if __name__ == '__main__':
     # 1. Importamos la función de inicialización
