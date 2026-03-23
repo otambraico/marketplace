@@ -49,31 +49,15 @@
 
     <nav class="bottom-nav d-flex d-md-none">
         <a href="/" class="nav-item-mobile {% if request.path == '/' %}active{% endif %}">
-            <span class="icon">📍</span><span>Mapa</span>
+            <span>📍</span><span>Mapa</span>
         </a>
-        
         {% if session.user_rol == 'mype' %}
         <a href="/dashboard_mype" class="nav-item-mobile {% if request.path == '/dashboard_mype' %}active{% endif %}">
-            <span class="icon">📦</span><span>Ventas</span>
+            <span>📦</span><span>Ventas</span>
         </a>
         {% endif %}
-
-        <a href="/mensajes" class="nav-item-mobile {% if request.path == '/mensajes' %}active{% endif %}">
-            <span class="icon">💬</span>
-            <span>Chats</span>
-        </a>
-
-        {% if session.user_id %}
-        <a href="/perfil" class="nav-item-mobile {% if request.path == '/perfil' %}active{% endif %}">
-            <span class="icon">👤</span>
-            <span>Perfil</span>
-        </a>
-        {% else %}
-        <a href="/login" class="nav-item-mobile">
-            <span class="icon">🔑</span>
-            <span>Entrar</span>
-        </a>
-        {% endif %}
+        <a href="/mensajes" class="nav-item-mobile"><span>💬</span><span>Chats</span></a>
+        <a href="/login" class="nav-item-mobile"><span>👤</span><span>Cuenta</span></a>
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
