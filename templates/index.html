@@ -9,7 +9,7 @@
         #map {
                 height: calc(100vh - 56px); /* 56px es la altura estándar del navbar de Bootstrap */
                 width: 100%;
-                z-index: 1;
+                display: block; /* Fuerza a que se comporte como bloque */
             }
 
             /* En móviles, ajustamos para la barra inferior */
@@ -34,22 +34,10 @@
         <p class="text-muted mb-0">Descubre negocios cerca de ti y chatea directamente.</p>
     </div>
 
-    <div id="map" class="shadow-sm"></div>
+    <div id="map" style="border: 1px solid #ccc;"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Forzar el re-calculo del tamaño del mapa tras la carga inicial
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                map.invalidateSize();
-            }, 500);
-        });
-
-        // También al cambiar el tamaño de la ventana (rotación de celular)
-        window.addEventListener('resize', function() {
-            map.invalidateSize();
-        });
-    </script>
+   
     <script>
         // 1. Definimos irAlChat de forma global para que el botón del popup la vea
         function irAlChat(id) {
@@ -113,6 +101,19 @@
                 .catch(err => console.error("Error cargando MYPES:", err));
         }
        
+        });
+    </script>
+     <script>
+        // Forzar el re-calculo del tamaño del mapa tras la carga inicial
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                map.invalidateSize();
+            }, 500);
+        });
+
+        // También al cambiar el tamaño de la ventana (rotación de celular)
+        window.addEventListener('resize', function() {
+            map.invalidateSize();
         });
     </script>
 {% endblock %}
