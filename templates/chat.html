@@ -1,86 +1,81 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white d-flex justify-content-between">
-                    <span>Chat con: <strong>{{ receptor.nombre }}</strong></span>
-                    <a href="/" class="btn-close btn-close-white"></a>
-                </div>
-                
-                <div id="chat-box" class="card-body overflow-auto" style="height: 400px; background-color: #f8f9fa;">
-                    {% for msg in historial %}
-                        <div class="mb-2 d-flex {% if msg.emisor_id == session['user_id'] %}justify-content-end{% endif %}">
-                            <div class="p-2 rounded-3 shadow-sm" 
-                                 style="max-width: 80%; {% if msg.emisor_id == session['user_id'] %}background-color: #dcf8c6;{% else %}background-color: #fff;{% endif %}">
-                                <small class="d-block fw-bold" style="font-size: 0.7rem;">{{ msg.emisor_nombre }}</small>
-                                {{ msg.contenido }}
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
 
-                <div class="card-footer bg-white border-top">
-                    <div class="input-group">
-                        <input type="text" id="input_msj" class="form-control" placeholder="Escribe un mensaje...">
-                        <button class="btn btn-primary" id="btn_enviar">
-                            <i class="bi bi-send"></i>
-                        </button>
-                    </div>
+{% block content %}
+<div class="chat-wrapper d-flex flex-column" style="height: calc(100vh - 150px);">
+    <div class="chat-header p-3 bg-white border-bottom d-flex align-items-center">
+        <a href="/mensajes" class="text-decoration-none me-3">⬅️</a>
+        <div class="user-info">
+            <h6 class="mb-0 fw-bold">{{ contacto.nombre }}</h6>
+            <small class="text-success">● En línea</small>
+        </div>
+    </div>
+
+    <div id="chat-box" class="flex-grow-1 p-3 overflow-auto" style="background-color: #f0f2f5;">
+        {% for m in mensajes %}
+            <div class="d-flex {% if m.remitente_id == session.user_id %}justify-content-end{% else %}justify-content-start{% endif %} mb-3">
+                <div class="message-bubble p-3 shadow-sm" 
+                     style="max-width: 75%; border-radius: 15px; 
+                            {% if m.remitente_id == session.user_id %}
+                                background-color: #dcf8c6; border-bottom-right-radius: 2px;
+                            {% else %}
+                                background-color: #ffffff; border-bottom-left-radius: 2px;
+                            {% endif %}">
+                    <p class="mb-1">{{ m.contenido }}</p>
+                    <small class="text-muted d-block text-end" style="font-size: 10px;">
+                        {{ m.fecha_envio.strftime('%H:%M') }}
+                    </small>
                 </div>
             </div>
-        </div>
+        {% endfor %}
+    </div>
+
+    <div class="chat-input p-3 bg-white border-top">
+        <form id="chat-form" class="d-flex gap-2">
+            <input type="text" id="mensaje-input" class="form-control border-0 bg-light py-2" 
+                   placeholder="Escribe un mensaje..." autocomplete="off">
+            <button type="submit" class="btn btn-primary rounded-circle" style="width: 45px; height: 45px;">
+                ✈️
+            </button>
+        </form>
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socketio/4.0.1/socketio.js"></script>
+
+
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
     const socket = io();
-    const receptor_id = "{{ receptor_id }}";
-    const emisor_id = "{{ session['user_id'] }}";
-    const emisor_nombre = "{{ session['user_nombre'] }}";
     const chatBox = document.getElementById('chat-box');
+    const chatForm = document.getElementById('chat-form');
+    
+    // Auto-scroll al final
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-    // --- NUEVO: Unirse a la sala privada al conectar ---
-    socket.on('connect', () => {
-        socket.emit('join', { user_id: emisor_id });
-    });
-
-    // Función para enviar mensaje
-    document.getElementById('btn_enviar').onclick = () => {
-        const input = document.getElementById('input_msj');
-        if (input.value.trim() !== "") {
+    chatForm.onsubmit = (e) => {
+        e.preventDefault();
+        const input = document.getElementById('mensaje-input');
+        if (input.value.trim()) {
+            // Siguiendo SOLID, el cliente solo envía datos, no lógica
             socket.emit('enviar_mensaje', {
-                'receptor_id': receptor_id,
-                'mensaje': input.value
+                destinatario_id: {{ contacto.id }},
+                mensaje: input.value
             });
-            input.value = "";
+            input.value = '';
         }
     };
 
-    // Escuchar nuevos mensajes
     socket.on('nuevo_mensaje', (data) => {
+        // Lógica para añadir la burbuja dinámicamente
         const div = document.createElement('div');
-        // Si el ID del que envía es el mío, se alinea a la derecha
-        const esMio = data.de_id == emisor_id;
-        
-        div.className = `mb-2 d-flex ${esMio ? 'justify-content-end' : 'justify-content-start'}`;
+        const esMio = data.remitente_id == {{ session.user_id }};
+        div.className = `d-flex ${esMio ? 'justify-content-end' : 'justify-content-start'} mb-3`;
         div.innerHTML = `
-            <div class="p-2 rounded-3 shadow-sm" style="max-width: 80%; background-color: ${esMio ? '#dcf8c6' : '#fff'};">
-                <small class="d-block fw-bold" style="font-size: 0.7rem;">${data.de}</small>
-                ${data.msg}
+            <div class="message-bubble p-3 shadow-sm" style="max-width: 75%; border-radius: 15px; background-color: ${esMio ? '#dcf8c6' : '#ffffff'};">
+                <p class="mb-1">${data.mensaje}</p>
             </div>
         `;
         chatBox.appendChild(div);
         chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-    // Enviar con la tecla Enter
-    document.getElementById('input_msj').addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-            document.getElementById('btn_enviar').click();
-        }
     });
 </script>
 {% endblock %}

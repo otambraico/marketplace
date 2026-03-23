@@ -521,45 +521,36 @@ def handle_connect():
     print(f"✅ Usuario conectado: {session.get('user_nombre')}")
 
 @socketio.on('enviar_mensaje')
-def handle_message(data):
-    """
-    data contiene: { 'receptor_id': X, 'mensaje': 'hola', 'emisor_nombre': 'Pepe' }
-    """
-    mensaje = data['mensaje']
-    receptor_id = data['receptor_id']
+def handle_mensaje(data):
     emisor_id = session.get('user_id')
-    emisor_nombre = session.get('user_nombre')
+    receptor_id = data['receptor_id']
+    contenido = data['contenido']
 
-    # Guardar en la base de datos (Opcional por ahora, pero recomendado)
-    if not mensaje or not receptor_id:
-        return
+    # 1. Persistencia (Responsabilidad Única: Guardar)
+    guardar_mensaje_db(emisor_id, receptor_id, contenido)
 
-    # 1. Guardar en PostgreSQL (Persistencia Real)
+    # 2. Notificación en Tiempo Real
+    emit('nuevo_mensaje', {
+        'remitente_id': emisor_id,
+        'mensaje': contenido
+    }, room=f"user_{receptor_id}")
+    
+    # También enviarlo al remitente para que lo vea en su pantalla
+    emit('nuevo_mensaje', {
+        'remitente_id': emisor_id,
+        'mensaje': contenido
+    }, room=f"user_{emisor_id}")
+
+def guardar_mensaje_db(remitente, destinatario, texto):
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT INTO mensajes (emisor_id, receptor_id, contenido) 
-            VALUES (%s, %s, %s)
-        ''', (emisor_id, receptor_id, mensaje))
-        conn.commit()
-    except Exception as e:
-        print(f"❌ Error al guardar mensaje: {e}")
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
-    
-    # 2. Emitir el mensaje de forma PRIVADA
-    # Enviamos a la sala del receptor y a la del emisor
-    payload = {
-        'msg': mensaje,
-        'de': emisor_nombre,
-        'de_id': emisor_id
-    }
-    
-    emit('nuevo_mensaje', payload, room=str(receptor_id))
-    emit('nuevo_mensaje', payload, room=str(emisor_id))
+    cursor.execute(
+        "INSERT INTO mensajes (emisor_id, receptor-id, contenido) VALUES (%s, %s, %s)",
+        (remitente, destinatario, texto)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 @app.route('/chat/<int:receptor_id>')
 @login_required
