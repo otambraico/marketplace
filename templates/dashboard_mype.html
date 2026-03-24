@@ -11,7 +11,7 @@
             <a href="/perfil_mype/editar" class="btn btn-outline-secondary btn-sm flex-fill">
                 <i class="bi bi-gear"></i> Ajustes
             </a>
-            <a href="/productos/nuevo" class="btn btn-primary btn-sm flex-fill">
+            <a href="/" class="btn btn-primary btn-sm flex-fill">
                 <i class="bi bi-plus-lg"></i> Nuevo Producto
             </a>
         </div>
@@ -49,7 +49,6 @@
                 <thead class="bg-light text-muted" style="font-size: 0.85rem;">
                     <tr>
                         <th class="ps-3">Producto</th>
-                        <th class="d-none d-md-table-cell">Categoría</th>
                         <th>Precio</th>
                         <th class="text-end pe-3">Acciones</th>
                     </tr>
@@ -60,31 +59,52 @@
                         <td class="ps-3">
                             <div class="d-flex align-items-center">
                                 <div class="bg-light rounded p-1 me-3 d-none d-sm-block">
-                                    <img src="{{ p.imagen_url if p.imagen_url else '/static/img/placeholder.png' }}" 
-                                         alt="{{ p.nombre }}" style="width: 40px; height: 40px; object-fit: cover;">
+                                    <img src="{{ p.foto_url if p.foto_url else '/static/img/placeholder.png' }}" 
+                                         alt="{{ p.nombre }}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
                                 </div>
                                 <div>
                                     <div class="fw-bold text-dark">{{ p.nombre }}</div>
-                                    <small class="text-muted d-md-none">{{ p.categoria }}</small>
+                                    <small class="text-muted text-truncate d-inline-block" style="max-width: 150px;">
+                                        {{ p.descripcion }}
+                                    </small>
                                 </div>
                             </div>
                         </td>
-                        <td class="d-none d-md-table-cell text-muted">{{ p.categoria }}</td>
                         <td class="fw-bold text-primary">S/ {{ "%.2f"|format(p.precio) }}</td>
                         <td class="text-end pe-3">
                             <div class="btn-group btn-group-sm">
                                 <a href="/productos/editar/{{ p.id }}" class="btn btn-light border">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <button onclick="confirmarEliminar({{ p.id }})" class="btn btn-light border text-danger">
+                                <button type="button" class="btn btn-light border text-danger" data-bs-toggle="modal" data-bs-target="#modalEliminar{{ p.id }}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
                         </td>
                     </tr>
+
+                    <div class="modal fade" id="modalEliminar{{ p.id }}" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                          <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold text-danger">Eliminar Producto</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                          </div>
+                          <div class="modal-body">
+                            ¿Estás seguro de que deseas eliminar <strong>{{ p.nombre }}</strong>? Esta acción no se puede deshacer.
+                          </div>
+                          <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                            <form action="/productos/eliminar/{{ p.id }}" method="POST">
+                                <button type="submit" class="btn btn-danger">Sí, Eliminar</button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center py-5 text-muted">
+                        <td colspan="3" class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                             Aún no tienes productos publicados.
                         </td>

@@ -346,86 +346,57 @@ def dashboard_mype():
                            productos=productos, 
                            mensajes_pendientes=mensajes_pendientes)
 
-@app.route('/agregar_producto', methods=['POST'])
+# --- FUNCIONALIDAD: NUEVO PRODUCTO ---
+@app.route('/productos/nuevo', methods=['GET', 'POST'])
 @login_required
-def agregar_producto():
+def nuevo_producto():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        precio = request.form.get('precio')
+        descripcion = request.form.get('descripcion')
+        foto_url = request.form.get('foto_url') # Alineado a la DB
         
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Buscamos el ID de la MYPE del usuario actual
-    # 1. Obtener el ID del perfil MYPE del usuario actual
-    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
-    mype = cursor.fetchone()
-    
-    if not mype:
-        flash("Error: No se encontró perfil MYPE asociado.", "danger")
-        return redirect('/dashboard_mype')
+        # OJO: Según tu DB, la relación es con perfiles_mype. 
+        # Asegúrate de que session['mype_id'] se guarde en el login.
+        mype_id = session.get('mype_id') 
 
-    # CAMBIO CRÍTICO: Acceder por nombre de columna 'id'
-    mype_id = mype['id']
-    
-    nombre = request.form['nombre']
-    descripcion = request.form['descripcion']
-    precio = request.form['precio']
-
-    try:
-        # 3. Insertar producto usando marcadores %s
-        cursor.execute('''
-            INSERT INTO productos (mype_id, nombre, descripcion, precio) 
-            VALUES (%s, %s, %s, %s)
-        ''', (mype_id, nombre, descripcion, precio))
-        
-        conn.commit()
-        flash("✅ Producto agregado con éxito", "success")
-    except Exception as e:
-        conn.rollback()
-        print(f"Error al agregar producto: {e}")
-        flash("❌ Error al guardar el producto", "danger")
-    finally:
-        cursor.close()
-        conn.close()
-        
-    return redirect('/dashboard_mype')
-
-@app.route('/eliminar_producto/<int:id>')
-@login_required
-def eliminar_producto(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        # 1. Obtener el mype_id del usuario que tiene la sesión iniciada
-        cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (session['user_id'],))
-        mype = cursor.fetchone()
-        
-        if not mype:
-            flash("Error de permisos: No se encontró perfil MYPE.", "danger")
-            return redirect('/dashboard_mype')
-
-        mype_id = mype['id']
-
-        # 2. Intentar eliminar el producto PERO validando que pertenezca a esta MYPE
-        # Esto evita que alguien borre productos ajenos cambiando el ID en la URL
-        cursor.execute('''
-            DELETE FROM productos 
-            WHERE id = %s AND mype_id = %s
-        ''', (id, mype_id))
-        
-        # rowcount nos dice cuántas filas se eliminaron realmente
-        if cursor.rowcount > 0:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO productos (mype_id, nombre, descripcion, precio, foto_url)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (mype_id, nombre, descripcion, precio, foto_url))
             conn.commit()
-            flash("🗑️ Producto eliminado correctamente.", "success")
-        else:
-            flash("⚠️ No se pudo eliminar: El producto no existe o no te pertenece.", "warning")
+            cursor.close()
+            conn.close()
+            flash("Producto publicado con éxito", "success")
+            return redirect('/dashboard_mype')
+        except Exception as e:
+            print(f"Error DB al crear producto: {e}")
+            flash("Error al guardar el producto", "danger")
 
-    except Exception as e:
-        conn.rollback()
-        print(f"Error al eliminar producto: {e}")
-        flash("❌ Error interno al intentar eliminar el producto.", "danger")
-    finally:
+    return render_template('nuevo_producto.html')
+
+
+# --- FUNCIONALIDAD: ELIMINAR PRODUCTO ---
+@app.route('/productos/eliminar/<int:producto_id>', methods=['POST'])
+@login_required
+def eliminar_producto(producto_id):
+    mype_id = session.get('mype_id')
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Seguridad: Solo borra si el producto_id coincide Y pertenece a esta MYPE
+        cursor.execute("DELETE FROM productos WHERE id = %s AND mype_id = %s", (producto_id, mype_id))
+        conn.commit()
         cursor.close()
         conn.close()
+        flash("Producto eliminado correctamente.", "success")
+    except Exception as e:
+        print(f"Error DB al eliminar: {e}")
+        flash("Hubo un error al eliminar el producto.", "danger")
         
     return redirect('/dashboard_mype')
 
