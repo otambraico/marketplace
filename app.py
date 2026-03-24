@@ -164,41 +164,58 @@ def bandeja_entrada():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Si ya está logueado, lo enviamos a su respectivo inicio
+    if 'user_id' in session:
+        return redirect('/dashboard_mype' if session.get('rol') == 'mype' else '/')
+
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-                
+        email = request.form.get('email')
+        password = request.form.get('password') # Idealmente esto debería estar encriptado (hash)
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE email = %s", (email,)) # [cite: 6]
+
+        # 1. Autenticación: Buscar al usuario
+        cursor.execute("SELECT id, nombre, rol, password FROM usuarios WHERE email = %s", (email,))
         user = cursor.fetchone()
+
+        # Validar contraseña (asumiendo texto plano para el ejemplo)
+        if user and user['password'] == password:
+            
+            # 2. Configurar la sesión BASE
+            session['user_id'] = user['id']
+            session['nombre'] = user['nombre']
+            session['rol'] = user['rol'] # Puede ser 'cliente' o 'mype'
+
+            # 3. EL CHECKLIST DE SEGURIDAD MYPE (La pieza clave)
+            if user['rol'] == 'mype':
+                # Buscamos en perfiles_mype el ID que le corresponde a este usuario
+                cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (user['id'],))
+                perfil = cursor.fetchone()
+                
+                if perfil:
+                    # Guardamos el mype_id en la sesión. 
+                    # Sin esto, no podría publicar productos.
+                    session['mype_id'] = perfil['id']
+                else:
+                    # Caso borde: Es MYPE pero no ha completado su perfil
+                    session['mype_id'] = None 
+                
+                cursor.close()
+                conn.close()
+                return redirect('/dashboard_mype')
+            
+            # Si es cliente normal
+            cursor.close()
+            conn.close()
+            return redirect('/')
+            
+        else:
+            flash("Correo o contraseña incorrectos.", "danger")
+            
         cursor.close()
         conn.close()
-        
-        # 1. Validamos si el usuario existe
-        if user and check_password_hash(user['password'], password):
-            # 2. Validamos la contraseña
-                if user['estado'] != 'activo':
-                   flash("⚠️ Tu cuenta está suspendida. Contacta al administrador.")
-                   return redirect('/login')
-                     
-                # Guardamos datos clave en la sesión
-                session['user_id'] = user['id']
-                session['user_nombre'] = user['nombre']
-                session['user_rol'] = user['rol']
-            
-                flash(f"¡Bienvenido de nuevo, {user['nombre']}!")
-            
-                # Redirección según el ROL (UX diferenciada)
-                if user['rol'] == 'admin':
-                    return redirect('/admin')
-                elif user['rol'] == 'mype':
-                    return redirect('/dashboard_mype')
-                return redirect('/') # El cliente vuelve al mapa
-                 
-        else:
-            flash("❌ El correo electrónico o la contraseña no está registrado.", "danger")
-            
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -399,6 +416,33 @@ def eliminar_producto(producto_id):
         flash("Hubo un error al eliminar el producto.", "danger")
         
     return redirect('/dashboard_mype')
+
+# --- FUNCIONALIDAD: AJUSTES (PERFIL MYPE) ---
+@app.route('/perfil_mype/editar', methods=['GET', 'POST'])
+@login_required
+def editar_perfil_mype():
+    mype_id = session.get('mype_id')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        descripcion = request.form.get('descripcion')
+        # Aquí puedes añadir rubro, contacto, etc.
+        
+        cursor.execute('''
+            UPDATE mypes SET nombre = %s, descripcion = %s
+            WHERE id = %s
+        ''', (nombre, descripcion, mype_id))
+        conn.commit()
+        flash("Perfil actualizado", "success")
+        return redirect('/dashboard_mype')
+
+    cursor.execute("SELECT * FROM mypes WHERE id = %s", (mype_id,))
+    mype = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return render_template('editar_mype.html', mype=mype)
 
 #Lógica del Admin
 @app.route('/admin')

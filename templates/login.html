@@ -11,47 +11,46 @@
     </style>
      
 </head>
+
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
-    <div class="card shadow-lg border-0" style="width: 100%; max-width: 450px; border-radius: 15px;">
-        <div class="card-body p-4 p-md-5">
-            <div class="text-center mb-4">
-                <h1 class="fw-bold" style="color: #007bff;">🏠 Mi Barrio</h1>
-                <p class="text-muted">Ingresa para ver las ofertas de tus vecinos</p>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
-            {% endwith %}
-
-            <form action="/login" method="POST">
-                <div class="form-floating mb-3">
-                    <input type="email" name="email" class="form-control" id="floatingEmail" placeholder="nombre@ejemplo.com" required>
-                    <label for="floatingEmail">Correo electrónico</label>
-                </div>
-                
-                <div class="form-floating mb-4">
-                    <input type="password" name="password" class="form-control" id="floatingPassword" placeholder="Contraseña" required>
-                    <label for="floatingPassword">Contraseña</label>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm p-4">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold text-primary">Iniciar Sesión</h3>
+                    <p class="text-muted">Accede a tu cuenta en el Marketplace</p>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-lg w-100 py-3 shadow-sm" style="border-radius: 10px; font-weight: 600;">
-                    🚀 Entrar al Marketplace
-                </button>
-            </form>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
 
-            <div class="text-center mt-4">
-                <p class="mb-0">¿Aún no tienes cuenta?</p>
-                <a href="/registro" class="text-decoration-none fw-bold">Regístrate como Vecino o MYPE</a>
+                <form action="/login" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Correo Electrónico</label>
+                        <input type="email" name="email" class="form-control" placeholder="tu@correo.com" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-3">Ingresar</button>
+                    
+                    <div class="text-center">
+                        <small class="text-muted">¿No tienes cuenta? <a href="/registro" class="text-decoration-none">Regístrate aquí</a></small>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
