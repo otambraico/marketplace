@@ -1,82 +1,92 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <title>Panel MYPE - {{ mype.nombre_comercial }}</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f8f9fa; }
-        .sidebar { width: 250px; background: #343a40; color: white; height: 100vh; padding: 20px; }
-        .main-content { flex: 1; padding: 40px; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <h2>{{ mype.nombre_comercial }}</h2>
-        <hr>
-        <p>🏠 <a href="/" style="color:white; text-decoration:none;">Ver mi tienda en mapa</a></p>
-        <p>📦 <a href="/dashboard_mype" style="color:white; text-decoration:none;">Mis Productos</a></p>
-            <p>💬   <a href="/mensajes" style="color:white; text-decoration:none;">
-                        Mensajes 
-                        {% if mensajes_pendientes and mensajes_pendientes > 0 %}
-                            <span class="badge bg-danger">{{ mensajes_pendientes }}</span>
-                        {% endif %}
-                    </a>
-            </p>
-        <br>
-        <a href="/logout" style="color:#ff6b6b;">Cerrar Sesión</a>
-    </div>  
+{% extends "base.html" %}
 
-    <div class="main-content">
-        <h1>Gestión de Productos</h1>
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+            <h2 class="fw-bold mb-0 text-primary">Panel de Control</h2>
+            <p class="text-muted mb-0">Gestiona tu negocio: <strong>{{ mype.nombre }}</strong></p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/perfil_mype/editar" class="btn btn-outline-secondary btn-sm flex-fill">
+                <i class="bi bi-gear"></i> Ajustes
+            </a>
+            <a href="/productos/nuevo" class="btn btn-primary btn-sm flex-fill">
+                <i class="bi bi-plus-lg"></i> Nuevo Producto
+            </a>
+        </div>
+    </div>
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}{% for m in messages %}<p style="color: green;">{{ m }}</p>{% endfor %}{% endif %}
-        {% endwith %}
-
-        <div class="card">
-            <h3>🚀 Subir Nuevo Producto / Oferta</h3>
-            <form action="/agregar_producto" method="POST">
-                <div class="form-group">
-                    <input type="text" name="nombre" placeholder="Nombre del producto" required>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="text-primary mb-1"><i class="bi bi-box-seam fs-4"></i></div>
+                    <h3 class="fw-bold mb-0">{{ productos|length }}</h3>
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">Productos</small>
                 </div>
-                <div class="form-group">
-                    <textarea name="descripcion" placeholder="Describe tu oferta..."></textarea>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="text-success mb-1"><i class="bi bi-chat-dots fs-4"></i></div>
+                    <h3 class="fw-bold mb-0">{{ mensajes_pendientes | default(0) }}</h3>
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">Msjs. Nuevos</small>
                 </div>
-                <div class="form-group">
-                    <input type="number" step="0.01" name="precio" placeholder="Precio (S/)" required>
-                </div>
-                <button type="submit">Publicar Producto</button>
-            </form>
+            </div>
+        </div>
         </div>
 
-        <div class="card">
-            <h3>📦 Tus Productos Activos</h3>
-            <table>
-                <thead>
+    <div class="card border-0 shadow-sm overflow-hidden">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold">Mis Productos</h6>
+            <span class="badge bg-soft-primary text-primary">{{ productos|length }} total</span>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-muted" style="font-size: 0.85rem;">
                     <tr>
-                        <th>Producto</th>
+                        <th class="ps-3">Producto</th>
+                        <th class="d-none d-md-table-cell">Categoría</th>
                         <th>Precio</th>
-                        <th>Fecha</th>
-                        <th>Acción</th>
+                        <th class="text-end pe-3">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in productos %}
                     <tr>
-                        <td><strong>{{ p.nombre }}</strong></td>
-                        <td>S/{{ p.precio }}</td>
-                        <td>{{ p.fecha_creacion.strftime('%Y-%m-%d') if p.fecha_creacion else 'S/D' }}</td>
-                        <td>
-                            <a href="/eliminar_producto/{{ p.id }}" 
-                            style="color:red; text-decoration:none;" 
-                            onclick="return confirm('¿Estás seguro de eliminar este producto?')">
-                            🗑️ Eliminar
-                            </a>
+                        <td class="ps-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded p-1 me-3 d-none d-sm-block">
+                                    <img src="{{ p.imagen_url if p.imagen_url else '/static/img/placeholder.png' }}" 
+                                         alt="{{ p.nombre }}" style="width: 40px; height: 40px; object-fit: cover;">
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark">{{ p.nombre }}</div>
+                                    <small class="text-muted d-md-none">{{ p.categoria }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="d-none d-md-table-cell text-muted">{{ p.categoria }}</td>
+                        <td class="fw-bold text-primary">S/ {{ "%.2f"|format(p.precio) }}</td>
+                        <td class="text-end pe-3">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/productos/editar/{{ p.id }}" class="btn btn-light border">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button onclick="confirmarEliminar({{ p.id }})" class="btn btn-light border text-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Aún no tienes productos publicados.
                         </td>
                     </tr>
                     {% endfor %}
@@ -84,5 +94,16 @@
             </table>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<style>
+    /* Estilos para una mejor experiencia móvil */
+    .bg-soft-primary { background-color: rgba(13, 110, 253, 0.1); }
+    .table-responsive { border: none; }
+    
+    @media (max-width: 576px) {
+        .card-body h3 { font-size: 1.25rem; }
+        .btn-group-sm > .btn { padding: 0.4rem 0.6rem; }
+    }
+</style>
+{% endblock %}
