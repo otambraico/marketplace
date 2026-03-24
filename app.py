@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch() # DEBE ser la primera línea, antes de cualquier otro import
+from gevent import monkey
+monkey.patch_all()
 
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -61,7 +61,7 @@ def login_required(f):
 # Usamos eventlet o gevent para mejor compatibilidad con WebSockets
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
-                    async_mode='eventlet', 
+                    async_mode='gevent', 
                     logger=True, 
                     engineio_logger=True)
 
