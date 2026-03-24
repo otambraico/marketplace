@@ -164,37 +164,53 @@ def bandeja_entrada():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # 1. Redirección automática si el usuario ya tiene sesión activa
     if 'user_id' in session:
-        return redirect('/dashboard_mype' if session.get('rol') == 'mype' else '/')
+        rol = session.get('rol')
+        if rol == 'admin':
+            return redirect('/admin') # O la ruta que uses para el admin
+        elif rol == 'mype':
+            return redirect('/dashboard_mype')
+        else:
+            return redirect('/perfil_cliente')
 
+    # 2. Procesamiento del Formulario
     if request.method == 'POST':
-        # .strip() elimina espacios accidentales al inicio o final del correo
-        email = request.form.get('email', '').strip() 
+        email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Buscar usuario
         cursor.execute("SELECT id, nombre, rol, password FROM usuarios WHERE email = %s", (email,))
         user = cursor.fetchone()
 
-        # RAYOS X: Esto aparecerá en los logs de Render
-        print(f"🔍 DEBUG LOGIN - Correo ingresado: '{email}'")
-        print(f"🔍 DEBUG LOGIN - Usuario en DB: {user}")
-
         if user:
-            # Validamos si es Diccionario o Tupla para evitar error 500
+            # Extraer datos soportando tanto diccionario como tupla
             db_password = user['password'] if isinstance(user, dict) else user[3]
             db_rol = user['rol'] if isinstance(user, dict) else user[2]
             db_id = user['id'] if isinstance(user, dict) else user[0]
             db_nombre = user['nombre'] if isinstance(user, dict) else user[1]
 
+            # 3. VERIFICACIÓN DE SEGURIDAD (Hash vs Texto Plano)
             if check_password_hash(db_password, password):
+                
+                # Configurar sesión base común a todos los roles
                 session['user_id'] = db_id
                 session['nombre'] = db_nombre
                 session['rol'] = db_rol
 
-                if db_rol == 'mype':
+                # 4. ENRUTAMIENTO POR ROL
+                if db_rol == 'admin':
+                    print(f"✅ ÉXITO - Admin logueado. ID: {db_id}")
+                    cursor.close()
+                    conn.close()
+                    # Redirige al panel del administrador
+                    return redirect('/admin') 
+
+                elif db_rol == 'mype':
+                    # Carga especial de seguridad para la MYPE
                     cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (db_id,))
                     perfil = cursor.fetchone()
                     
@@ -203,21 +219,29 @@ def login():
                     else:
                         session['mype_id'] = None 
                     
-                    print(f"✅ ÉXITO - MYPE logueada. ID Sesión: {session['user_id']}, MYPE ID: {session['mype_id']}")
+                    print(f"✅ ÉXITO - MYPE logueada. ID: {db_id}, MYPE ID: {session['mype_id']}")
                     cursor.close()
                     conn.close()
                     return redirect('/dashboard_mype')
+
+                elif db_rol == 'cliente':
+                    print(f"✅ ÉXITO - Cliente logueado. ID: {db_id}")
+                    cursor.close()
+                    conn.close()
+                    # Redirige al inicio (mapa/marketplace)
+                    return redirect('/perfil_cliente')
                 
-                # Cliente
-                print(f"✅ ÉXITO - Cliente logueado. ID Sesión: {session['user_id']}")
-                cursor.close()
-                conn.close()
-                return redirect('/')
+                else:
+                    # Fallback por si hay un rol mal escrito en la BD
+                    cursor.close()
+                    conn.close()
+                    return redirect('/')
+
             else:
-                print("❌ ERROR - La contraseña no coincide con la BD.")
+                print("❌ ERROR - Contraseña incorrecta (Fallo en check_password_hash).")
                 flash("Correo o contraseña incorrectos.", "danger")
         else:
-            print("❌ ERROR - El correo no existe en la BD.")
+            print(f"❌ ERROR - Usuario no encontrado para el correo: {email}")
             flash("Correo o contraseña incorrectos.", "danger")
             
         cursor.close()
