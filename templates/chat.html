@@ -35,69 +35,59 @@
 
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
-    const socket = io(); // Conexión automática
+    const socket = io();
+    const chatBox = document.getElementById('chat-box');
     const miId = {{ session.user_id }};
+    const receptorId = {{ contacto.id }};
 
-    // CRÍTICO: Avisar al servidor que estamos listos para recibir
+    // SRP: Responsabilidad de Scroll
+    function scrollToBottom() {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Handshake: Unirse a la sala privada
     socket.on('connect', () => {
+        console.log("✅ Conectado al servidor de chat");
         socket.emit('join', { user_id: miId });
     });
 
-    // 2. Evento de conexión (SOLID: Handshake inicial)
-    socket.on('connect', () => {
-        console.log("Conectado al servidor de chat");
-        // Notificamos al servidor quiénes somos para unirnos a nuestra sala privada
-        socket.emit('join', { user_id: miId });
-    });
-
-    // Envío de mensaje
+    // Envío (Emisor)
     document.getElementById('chat-form').onsubmit = (e) => {
         e.preventDefault();
         const input = document.getElementById('mensaje-input');
-        if (input.value.trim()) {
+        const msg = input.value.trim();
+        if (msg) {
             socket.emit('enviar_mensaje', {
-                receptor_id: {{ contacto.id }},
-                mensaje: input.value
+                receptor_id: receptorId,
+                mensaje: msg
             });
             input.value = '';
         }
     };
 
-    // Escucha de mensaje
+    // Recepción (Receptor/Feedback)
     socket.on('nuevo_mensaje', (data) => {
-        // Solo renderizar si el mensaje pertenece a esta conversación específica
-        if (data.emisor_id == {{ contacto.id }} || data.emisor_id == miId) {
-            renderizarBurbuja(data); // Tu función de renderizado
+        // Validación de contexto (Seguridad)
+        if (data.emisor_id == receptorId || data.emisor_id == miId) {
+            renderizarBurbuja(data);
             scrollToBottom();
         }
     });
 
-    // 5. Función de Renderizado (SRP: Responsabilidad visual únicamente)
     function renderizarBurbuja(data) {
         const esMio = data.emisor_id == miId;
         const div = document.createElement('div');
-        
         div.className = `d-flex ${esMio ? 'justify-content-end' : 'justify-content-start'} mb-3`;
-        
-        // Estilo tipo WhatsApp con burbujas dinámicas
         div.innerHTML = `
-            <div class="p-2 px-3 shadow-sm" style="
-                max-width: 80%; 
-                border-radius: 15px; 
-                background-color: ${esMio ? '#dcf8c6' : '#ffffff'};
-                border-bottom-${esMio ? 'right' : 'left'}-radius: 2px;
-            ">
+            <div class="p-2 px-3 shadow-sm" style="max-width: 80%; border-radius: 15px; 
+                 background-color: ${esMio ? '#dcf8c6' : '#ffffff'};
+                 border-bottom-${esMio ? 'right' : 'left'}-radius: 2px;">
                 <p class="mb-0">${data.mensaje}</p>
-                <small class="text-muted d-block text-end" style="font-size: 10px; margin-top: 4px;">
-                    ${data.fecha || 'Ahora'}
-                </small>
-            </div>
-        `;
-        
+                <small class="text-muted d-block text-end" style="font-size: 10px;">${data.fecha || 'Ahora'}</small>
+            </div>`;
         chatBox.appendChild(div);
     }
 
-    // Ejecución inicial
     scrollToBottom();
 </script>
 {% endblock %}

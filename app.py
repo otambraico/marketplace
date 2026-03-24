@@ -66,9 +66,9 @@ def on_join(data):
     """SRP: Responsabilidad de conectar al usuario a su canal privado"""
     user_id = session.get('user_id')
     if user_id:
-        room = f"user_{user_id}"
-        join_room(room)
-        print(f"📡 Usuario {user_id} conectado a sala: {room}")
+        room = (f"user_{user_id}")
+        #join_room(room)
+        #print(f"📡 Usuario {user_id} conectado a sala: {room}")
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
@@ -94,7 +94,7 @@ def handle_mensaje(data):
             'emisor_id': emisor_id,
             'receptor_id': receptor_id,
             'mensaje': contenido
-        }
+            }
         # Enviar al receptor y al emisor (para feedback visual)
         emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
         emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
