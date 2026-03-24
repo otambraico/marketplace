@@ -58,8 +58,11 @@ def login_required(f):
     return decorated_function
 
 # Inicializamos Socket.io
-# Inicialización (Asegúrate de tener esto)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Usamos eventlet o gevent para mejor compatibilidad con WebSockets
+socketio = SocketIO(app, 
+                    cors_allowed_origins="*", 
+                    async_mode='eventlet', 
+                    manage_session=True)
 
 @socketio.on('join')
 def on_join(data):

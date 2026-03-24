@@ -36,7 +36,9 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script>
-    const socket = io();
+    const socket = io({
+        transports: ['websocket', 'polling']
+    });
     const chatBox = document.getElementById('chat-box');
     const miId = {{ session.user_id }};
     const receptorId = {{ contacto.id }};
@@ -48,8 +50,11 @@
 
     // Handshake: Unirse a la sala privada
     socket.on('connect', () => {
-        console.log("✅ Conectado al servidor de chat");
-        socket.emit('join', { user_id: miId });
+        console.log("✅ Conexión establecida ID:", socket.id);
+        socket.emit('join', { user_id: {{ session.user_id }} });
+    });
+    socket.on('connect_error', (error) => {
+        console.error("❌ Error de conexión:", error);
     });
 
     // Envío (Emisor)
