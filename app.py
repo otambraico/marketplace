@@ -189,7 +189,7 @@ def login():
             db_id = user['id'] if isinstance(user, dict) else user[0]
             db_nombre = user['nombre'] if isinstance(user, dict) else user[1]
 
-            if db_password == password:
+            if check_password_hash(db_password, password):
                 session['user_id'] = db_id
                 session['nombre'] = db_nombre
                 session['rol'] = db_rol
