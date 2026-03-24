@@ -42,8 +42,12 @@
 
     // 2. Inicialización del Socket con reconexión activa
     const socket = io({
-        transports: ['websocket', 'polling'],
-        upgrade: true
+    transports: ['websocket'], // Forzamos solo websocket para evitar el rebote con polling
+    upgrade: false,             // Evitamos intentos de upgrade innecesarios
+    timeout: 20000,            // 20 segundos de gracia para conectar
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000
     });
 
     const chatBox = document.getElementById('chat-box');
@@ -63,6 +67,11 @@
 
     socket.on('connect_error', (error) => {
         console.error("❌ Error de conexión Socket:", error);
+    });
+
+    socket.on('connect', () => {
+        console.log("✅ Conexión establecida. SID:", socket.id);
+        socket.emit('join', { user_id: USER_ID });
     });
 
     // Envío de mensajes

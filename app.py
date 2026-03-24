@@ -1,5 +1,6 @@
 import eventlet
 eventlet.monkey_patch()
+from datetime import timedelta
 
 # Recién ahora puedes importar el resto
 import os
@@ -15,6 +16,13 @@ from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_segura_dev')
+
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'una_clave_muy_segura')
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+# CRÍTICO para Render y WebSockets:
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 
 # --- 1. DEFINIR LA CONEXIÓN PRIMERO ---
 def get_db_connection():
@@ -65,8 +73,9 @@ def login_required(f):
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
                     async_mode='eventlet', 
-                    engineio_logger=True, # Esto nos dará logs detallados en Render
-                    logger=True)
+                    manage_session=True, # Permite que el socket use la sesión de Flask
+                    ping_timeout=60,      # Aumentamos el tiempo de espera
+                    ping_interval=25)
 
 @socketio.on('join')
 def on_join(data):
@@ -79,47 +88,37 @@ def on_join(data):
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
-    try:
-        emisor_id = session.get('user_id')
-        receptor_id = data.get('receptor_id')
-        contenido = data.get('mensaje')
+    emisor_id = session.get('user_id')
+    receptor_id = data.get('receptor_id')
+    contenido = data.get('mensaje')
+    
+    # LOG DE SEGURIDAD (Si esto no sale en Render, el JS no está enviando nada)
+    print(f"📩 Intentando procesar mensaje de {emisor_id} para {receptor_id}")
 
-        # Registro para depuración en los logs de Render
-        print(f"DEBUG: Datos recibidos -> Emisor: {emisor_id}, Receptor: {receptor_id}, Contenido: {contenido}")
-
-        if not emisor_id:
-            print("❌ ERROR: No hay user_id en la sesión")
-            return
-
-        # PERSISTENCIA (Principio de Responsabilidad Única)
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "INSERT INTO mensajes (emisor_id, receptor_id, contenido, leido) VALUES (%s, %s, %s, FALSE) RETURNING id",
-            (emisor_id, receptor_id, contenido)
-        )
-        nuevo_id = cursor.fetchone()
-        conn.commit()
-        
-        print(f"✅ ÉXITO: Mensaje guardado en Supabase con ID: {nuevo_id}")
-
-        # EMISIÓN
-        payload = {
-            'emisor_id': emisor_id,
-            'receptor_id': receptor_id,
-            'mensaje': contenido,
-            'fecha': 'Ahora'
-        }
-        emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
-        emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
-
-    except Exception as e:
-        print(f"🔥 ERROR CRÍTICO en handle_mensaje: {str(e)}")
-        # Esto enviará el error a los logs de Render para que lo veas
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+    if emisor_id and receptor_id and contenido:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+                (emisor_id, receptor_id, contenido)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            payload = {
+                'emisor_id': emisor_id,
+                'receptor_id': receptor_id,
+                'mensaje': contenido,
+                'fecha': 'Ahora'
+            }
+            # Emitir a las salas específicas
+            emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
+            emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
+            print("✅ Mensaje enviado y guardado con éxito")
+        except Exception as e:
+            print(f"❌ Error DB: {e}")
 
 @app.route('/mensajes')
 @login_required
