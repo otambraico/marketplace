@@ -164,53 +164,60 @@ def bandeja_entrada():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Si ya está logueado, lo enviamos a su respectivo inicio
     if 'user_id' in session:
         return redirect('/dashboard_mype' if session.get('rol') == 'mype' else '/')
 
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password') # Idealmente esto debería estar encriptado (hash)
+        # .strip() elimina espacios accidentales al inicio o final del correo
+        email = request.form.get('email', '').strip() 
+        password = request.form.get('password', '')
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 1. Autenticación: Buscar al usuario
         cursor.execute("SELECT id, nombre, rol, password FROM usuarios WHERE email = %s", (email,))
         user = cursor.fetchone()
 
-        # Validar contraseña (asumiendo texto plano para el ejemplo)
-        if user and user['password'] == password:
-            
-            # 2. Configurar la sesión BASE
-            session['user_id'] = user['id']
-            session['nombre'] = user['nombre']
-            session['rol'] = user['rol'] # Puede ser 'cliente' o 'mype'
+        # RAYOS X: Esto aparecerá en los logs de Render
+        print(f"🔍 DEBUG LOGIN - Correo ingresado: '{email}'")
+        print(f"🔍 DEBUG LOGIN - Usuario en DB: {user}")
 
-            # 3. EL CHECKLIST DE SEGURIDAD MYPE (La pieza clave)
-            if user['rol'] == 'mype':
-                # Buscamos en perfiles_mype el ID que le corresponde a este usuario
-                cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (user['id'],))
-                perfil = cursor.fetchone()
+        if user:
+            # Validamos si es Diccionario o Tupla para evitar error 500
+            db_password = user['password'] if isinstance(user, dict) else user[3]
+            db_rol = user['rol'] if isinstance(user, dict) else user[2]
+            db_id = user['id'] if isinstance(user, dict) else user[0]
+            db_nombre = user['nombre'] if isinstance(user, dict) else user[1]
+
+            if db_password == password:
+                session['user_id'] = db_id
+                session['nombre'] = db_nombre
+                session['rol'] = db_rol
+
+                if db_rol == 'mype':
+                    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (db_id,))
+                    perfil = cursor.fetchone()
+                    
+                    if perfil:
+                        session['mype_id'] = perfil['id'] if isinstance(perfil, dict) else perfil[0]
+                    else:
+                        session['mype_id'] = None 
+                    
+                    print(f"✅ ÉXITO - MYPE logueada. ID Sesión: {session['user_id']}, MYPE ID: {session['mype_id']}")
+                    cursor.close()
+                    conn.close()
+                    return redirect('/dashboard_mype')
                 
-                if perfil:
-                    # Guardamos el mype_id en la sesión. 
-                    # Sin esto, no podría publicar productos.
-                    session['mype_id'] = perfil['id']
-                else:
-                    # Caso borde: Es MYPE pero no ha completado su perfil
-                    session['mype_id'] = None 
-                
+                # Cliente
+                print(f"✅ ÉXITO - Cliente logueado. ID Sesión: {session['user_id']}")
                 cursor.close()
                 conn.close()
-                return redirect('/dashboard_mype')
-            
-            # Si es cliente normal
-            cursor.close()
-            conn.close()
-            return redirect('/')
-            
+                return redirect('/')
+            else:
+                print("❌ ERROR - La contraseña no coincide con la BD.")
+                flash("Correo o contraseña incorrectos.", "danger")
         else:
+            print("❌ ERROR - El correo no existe en la BD.")
             flash("Correo o contraseña incorrectos.", "danger")
             
         cursor.close()
