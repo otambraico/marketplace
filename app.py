@@ -63,31 +63,36 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 @socketio.on('join')
 def on_join(data):
-    """SRP: Responsabilidad de conectar al usuario a su canal privado"""
+    """SRP: Conectar al usuario a su canal privado"""
     user_id = session.get('user_id')
     if user_id:
-        room = (f"user_{user_id}")
-        #join_room(room)
-        #print(f"📡 Usuario {user_id} conectado a sala: {room}")
+        room = f"user_{user_id}"
+        join_room(room) # DESCOMENTAR ESTO
+        print(f"📡 Usuario {user_id} unido a sala: {room}")
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
-    """SRP: Gestión de envío y persistencia"""
     emisor_id = session.get('user_id')
     receptor_id = data.get('receptor_id')
     contenido = data.get('mensaje')
 
+    print(f"DEBUG: Intentando enviar de {emisor_id} a {receptor_id}: {contenido}")
+
     if emisor_id and receptor_id and contenido:
-        # 1. Persistencia en DB (Lo que llenará Supabase)
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
-            (emisor_id, receptor_id, contenido)
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+                (emisor_id, receptor_id, contenido)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("✅ Mensaje guardado en Supabase")
+        except Exception as e:
+            print(f"❌ Error DB al guardar mensaje: {e}")
+            return # Detener si falla la persistencia
 
         # 2. Emisión en Tiempo Real
         payload = {
