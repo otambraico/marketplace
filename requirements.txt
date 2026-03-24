@@ -1,6 +1,7 @@
-flask
-flask-socketio
-eventlet
-gunicorn
-werkzeug
-psycopg2-binary
+flask==3.0.2
+flask-socketio==5.3.6
+eventlet==0.35.2
+gunicorn==21.2.0
+werkzeug==3.0.1
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1

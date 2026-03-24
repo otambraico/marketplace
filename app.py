@@ -62,7 +62,8 @@ def login_required(f):
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
                     async_mode='eventlet', 
-                    manage_session=True)
+                    logger=True, 
+                    engineio_logger=True)
 
 @socketio.on('join')
 def on_join(data):
