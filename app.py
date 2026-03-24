@@ -1,13 +1,16 @@
 import eventlet
 eventlet.monkey_patch()
 
+# Recién ahora puedes importar el resto
+import os
+from flask import Flask, render_template, request, redirect, flash, session, jsonify
+from flask_socketio import SocketIO, emit, join_room
+
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_socketio import SocketIO, emit, join_room, leave_room
 import psycopg2
 from functools import wraps
 from psycopg2.extras import RealDictCursor # Para acceder por nombre de columna [cite: 12, 20]
-import os
 from database import init_db # [cite: 1] Asegúrate de importar ambos
 
 app = Flask(__name__)
