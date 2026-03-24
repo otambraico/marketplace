@@ -64,7 +64,7 @@ def login_required(f):
 # Usamos eventlet o gevent para mejor compatibilidad con WebSockets
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
-                    async_mode='gevent', 
+                    async_mode='eventlet', 
                     logger=True, 
                     engineio_logger=True)
 
