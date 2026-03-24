@@ -1,5 +1,5 @@
-from gevent import monkey
-monkey.patch_all()
+import eventlet
+eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
