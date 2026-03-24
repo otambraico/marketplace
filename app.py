@@ -72,10 +72,11 @@ def login_required(f):
 # Usamos eventlet o gevent para mejor compatibilidad con WebSockets
 socketio = SocketIO(app, 
                     cors_allowed_origins="*", 
-                    async_mode='eventlet', 
-                    manage_session=True, # Permite que el socket use la sesión de Flask
-                    ping_timeout=60,      # Aumentamos el tiempo de espera
-                    ping_interval=25)
+                    async_mode='eventlet',
+                    manage_session=True,
+                    ping_timeout=120,    # Aumentamos a 2 min para evitar cierres abruptos
+                    ping_interval=25,
+                    always_connect=True) # Fuerza la persistencia de la conexión
 
 @socketio.on('join')
 def on_join(data):
@@ -88,21 +89,27 @@ def on_join(data):
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
+    # Obtenemos los datos con precaución
     emisor_id = session.get('user_id')
     receptor_id = data.get('receptor_id')
-    contenido = data.get('mensaje')
-    
-    # LOG DE SEGURIDAD (Si esto no sale en Render, el JS no está enviando nada)
-    print(f"📩 Intentando procesar mensaje de {emisor_id} para {receptor_id}")
+    contenido = data.get('mensaje', '').strip()
 
-    if emisor_id and receptor_id and contenido:
+    if not emisor_id:
+        print("❌ Error: emisor_id no encontrado en sesión")
+        return
+
+    print(f"📩 Procesando: De {emisor_id} para {receptor_id}")
+
+    if receptor_id and contenido:
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
+            # Usamos RETURNING para confirmar que la DB lo aceptó
             cursor.execute(
-                "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
+                "INSERT INTO mensajes (emisor_id, receptor_id, contenido, leido) VALUES (%s, %s, %s, FALSE) RETURNING id",
                 (emisor_id, receptor_id, contenido)
             )
+            nuevo_id = cursor.fetchone()
             conn.commit()
             cursor.close()
             conn.close()
@@ -113,13 +120,15 @@ def handle_mensaje(data):
                 'mensaje': contenido,
                 'fecha': 'Ahora'
             }
-            # Emitir a las salas específicas
+
+            # Emitir a las salas
             emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
             emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
-            print("✅ Mensaje enviado y guardado con éxito")
-        except Exception as e:
-            print(f"❌ Error DB: {e}")
+            print(f"✅ Éxito: Mensaje {nuevo_id} guardado y emitido")
 
+        except Exception as e:
+            print(f"🔥 Error crítico en DB: {e}")
+            
 @app.route('/mensajes')
 @login_required
 def bandeja_entrada():

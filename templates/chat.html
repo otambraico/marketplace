@@ -41,39 +41,44 @@
     const CONTACTO_ID = parseInt("{{ contacto.id }}");
 
     // 2. Inicialización del Socket con reconexión activa
+    // 1. Configuración Robusta del Socket
     const socket = io({
-    transports: ['websocket'], // Forzamos solo websocket para evitar el rebote con polling
-    upgrade: false,             // Evitamos intentos de upgrade innecesarios
-    timeout: 20000,            // 20 segundos de gracia para conectar
-    reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 1000
+        transports: ['websocket', 'polling'], // Permitimos fallback si websocket falla
+        upgrade: true,
+        timeout: 30000,           // Aumentamos a 30s para evitar el error de timeout
+        reconnection: true,
+        reconnectionAttempts: 15, // Más intentos para redes móviles inestables
+        reconnectionDelay: 2000   // Esperamos 2s entre reintentos
     });
 
     const chatBox = document.getElementById('chat-box');
     const chatForm = document.getElementById('chat-form');
     const inputMsg = document.getElementById('mensaje-input');
 
-    // SRP: Función de Scroll
+    // 2. SRP: Única responsabilidad de Scroll
     function scrollToBottom() {
-        chatBox.scrollTop = chatBox.scrollHeight;
+        if (chatBox) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
     }
 
-    // Handshake: Unirse a la sala
+    // 3. Handshake Unificado (Eliminamos el duplicado)
     socket.on('connect', () => {
-        console.log("✅ Conectado. ID de Socket:", socket.id);
+        console.log("🟢 Conexión Exitosa. SID:", socket.id);
+        // Usamos USER_ID definido previamente en el script
         socket.emit('join', { user_id: USER_ID });
     });
 
+    // 4. Manejo de Errores con Feedback
     socket.on('connect_error', (error) => {
-        console.error("❌ Error de conexión Socket:", error);
+        console.error("❌ Fallo en conexión:", error.message);
+        // Si hay timeout, el socket intentará reconectar automáticamente por la config de arriba
     });
 
-    socket.on('connect', () => {
-        console.log("✅ Conexión establecida. SID:", socket.id);
-        socket.emit('join', { user_id: USER_ID });
+    socket.on('disconnect', (reason) => {
+        console.warn("🟡 Socket desconectado por:", reason);
     });
-
+    
     // Envío de mensajes
     chatForm.addEventListener('submit', (e) => {
         e.preventDefault();
