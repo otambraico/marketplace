@@ -72,37 +72,47 @@ def on_join(data):
 
 @socketio.on('enviar_mensaje')
 def handle_mensaje(data):
-    emisor_id = session.get('user_id')
-    receptor_id = data.get('receptor_id')
-    contenido = data.get('mensaje')
+    try:
+        emisor_id = session.get('user_id')
+        receptor_id = data.get('receptor_id')
+        contenido = data.get('mensaje')
 
-    print(f"DEBUG: Intentando enviar de {emisor_id} a {receptor_id}: {contenido}")
+        # Registro para depuración en los logs de Render
+        print(f"DEBUG: Datos recibidos -> Emisor: {emisor_id}, Receptor: {receptor_id}, Contenido: {contenido}")
 
-    if emisor_id and receptor_id and contenido:
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO mensajes (emisor_id, receptor_id, contenido) VALUES (%s, %s, %s)",
-                (emisor_id, receptor_id, contenido)
-            )
-            conn.commit()
-            cursor.close()
-            conn.close()
-            print("✅ Mensaje guardado en Supabase")
-        except Exception as e:
-            print(f"❌ Error DB al guardar mensaje: {e}")
-            return # Detener si falla la persistencia
+        if not emisor_id:
+            print("❌ ERROR: No hay user_id en la sesión")
+            return
 
-        # 2. Emisión en Tiempo Real
+        # PERSISTENCIA (Principio de Responsabilidad Única)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "INSERT INTO mensajes (emisor_id, receptor_id, contenido, leido) VALUES (%s, %s, %s, FALSE) RETURNING id",
+            (emisor_id, receptor_id, contenido)
+        )
+        nuevo_id = cursor.fetchone()
+        conn.commit()
+        
+        print(f"✅ ÉXITO: Mensaje guardado en Supabase con ID: {nuevo_id}")
+
+        # EMISIÓN
         payload = {
             'emisor_id': emisor_id,
             'receptor_id': receptor_id,
-            'mensaje': contenido
-            }
-        # Enviar al receptor y al emisor (para feedback visual)
+            'mensaje': contenido,
+            'fecha': 'Ahora'
+        }
         emit('nuevo_mensaje', payload, room=f"user_{receptor_id}")
         emit('nuevo_mensaje', payload, room=f"user_{emisor_id}")
+
+    except Exception as e:
+        print(f"🔥 ERROR CRÍTICO en handle_mensaje: {str(e)}")
+        # Esto enviará el error a los logs de Render para que lo veas
+    finally:
+        if 'cursor' in locals(): cursor.close()
+        if 'conn' in locals(): conn.close()
 
 @app.route('/mensajes')
 @login_required
