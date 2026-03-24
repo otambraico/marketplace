@@ -36,19 +36,19 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script>
-    // 1. Extraemos variables de Jinja de forma segura (Esto evita errores en VS Code)
-    const USER_ID = parseInt("{{ session.user_id }}");
-    const CONTACTO_ID = parseInt("{{ contacto.id }}");
+    // Usamos |default y |tojson para asegurar que siempre haya un valor válido
+    const USER_ID = parseInt("{{ session.user_id | default(0) }}");
+    const CONTACTO_ID = parseInt("{{ contacto.id | default(0) }}");
 
-    // 2. Inicialización del Socket con reconexión activa
-    // 1. Configuración Robusta del Socket
+    // Validación inmediata: Si es NaN, mostramos error en consola para no intentar enviar
+    if (isNaN(CONTACTO_ID) || CONTACTO_ID === 0) {
+        console.error("❌ Error Crítico: CONTACTO_ID es inválido. Revisa la variable 'contacto' en el backend.");
+    }
+
     const socket = io({
-        transports: ['websocket', 'polling'], // Permitimos fallback si websocket falla
-        upgrade: true,
-        timeout: 30000,           // Aumentamos a 30s para evitar el error de timeout
+        transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 15, // Más intentos para redes móviles inestables
-        reconnectionDelay: 2000   // Esperamos 2s entre reintentos
+        timeout: 30000
     });
 
     const chatBox = document.getElementById('chat-box');
@@ -78,20 +78,23 @@
     socket.on('disconnect', (reason) => {
         console.warn("🟡 Socket desconectado por:", reason);
     });
-    
+
     // Envío de mensajes
     chatForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const texto = inputMsg.value.trim();
-        
-        if (texto) {
-            console.log("✈️ Enviando a:", CONTACTO_ID);
-            socket.emit('enviar_mensaje', {
-                receptor_id: CONTACTO_ID,
-                mensaje: texto
-            });
-            inputMsg.value = '';
-        }
+    e.preventDefault();
+    const texto = inputMsg.value.trim();
+    
+    // Verificamos que el socket esté conectado y el ID sea válido
+    if (texto && socket.connected && !isNaN(CONTACTO_ID)) {
+        console.log("✈️ Enviando mensaje real a ID:", CONTACTO_ID);
+        socket.emit('enviar_mensaje', {
+            receptor_id: CONTACTO_ID,
+            mensaje: texto
+        });
+        inputMsg.value = '';
+    } else {
+        console.warn("⚠️ No se pudo enviar: Socket desconectado o ID inválido");
+    }
     });
 
     // Recepción de mensajes

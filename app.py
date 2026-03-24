@@ -128,7 +128,7 @@ def handle_mensaje(data):
 
         except Exception as e:
             print(f"🔥 Error crítico en DB: {e}")
-            
+
 @app.route('/mensajes')
 @login_required
 def bandeja_entrada():
@@ -584,33 +584,33 @@ def eliminar_barrio(id):
 @app.route('/chat/<int:receptor_id>')
 @login_required
 def chat_personal(receptor_id):
-    emisor_id = session.get('user_id')
-    
-    # 1. Obtener datos del receptor para mostrar su nombre en el chat
+    user_id = session.get('user_id') # Esta es tu variable local
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("SELECT nombre FROM usuarios WHERE id = %s", (receptor_id,))
+       
+    # CORRECCIÓN 1: Incluir 'id' en el SELECT para que el JS lo reciba
+    cursor.execute("SELECT id, nombre FROM usuarios WHERE id = %s", (receptor_id,))
     contacto = cursor.fetchone()
     
     if not contacto:
-        
+        cursor.close()
+        conn.close()
         flash("El usuario no existe.", "warning")
         return redirect('/')
 
-    # 2. Cargar historial de mensajes entre estos dos usuarios
+    # CORRECCIÓN 2: Usar 'user_id' en lugar de 'emisor_id' para coincidir con la sesión
     cursor.execute('''
         SELECT * FROM mensajes 
         WHERE (emisor_id = %s AND receptor_id = %s) 
            OR (emisor_id = %s AND receptor_id = %s)
         ORDER BY fecha ASC
-    ''', (emisor_id, receptor_id, receptor_id, emisor_id))
+    ''', (user_id, receptor_id, receptor_id, user_id))
     historial = cursor.fetchall()
     
     cursor.close()
     conn.close()
 
-    # IMPORTANTE: Pasamos 'contacto' e 'historial' para que coincidan con el HTML
+    # Ahora 'contacto' contiene {'id': X, 'nombre': '...'} y el JS funcionará
     return render_template('chat.html', contacto=contacto, historial=historial)
 
 if __name__ == '__main__':
