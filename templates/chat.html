@@ -27,7 +27,7 @@
 
     <div class="p-3 bg-white border-top">
         <form id="chat-form" class="d-flex gap-2">
-            <input type="text" id="mensaje-input" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off">
+            <input type="text" id="mensaje-input" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off" required>
             <button type="submit" class="btn btn-primary">Enviar</button>
         </form>
     </div>
@@ -36,54 +36,66 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <script>
-    const socket = io({
-        transports: ['websocket', 'polling']
-    });
-    const chatBox = document.getElementById('chat-box');
-    const miId = {{ session.user_id }};
-    const receptorId = {{ contacto.id }};
+    // 1. Extraemos variables de Jinja de forma segura (Esto evita errores en VS Code)
+    const USER_ID = parseInt("{{ session.user_id }}");
+    const CONTACTO_ID = parseInt("{{ contacto.id }}");
 
-    // SRP: Responsabilidad de Scroll
+    // 2. Inicialización del Socket con reconexión activa
+    const socket = io({
+        transports: ['websocket', 'polling'],
+        upgrade: true
+    });
+
+    const chatBox = document.getElementById('chat-box');
+    const chatForm = document.getElementById('chat-form');
+    const inputMsg = document.getElementById('mensaje-input');
+
+    // SRP: Función de Scroll
     function scrollToBottom() {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // Handshake: Unirse a la sala privada
+    // Handshake: Unirse a la sala
     socket.on('connect', () => {
-        console.log("✅ Conexión establecida ID:", socket.id);
-        socket.emit('join', { user_id: {{ session.user_id }} });
+        console.log("✅ Conectado. ID de Socket:", socket.id);
+        socket.emit('join', { user_id: USER_ID });
     });
+
     socket.on('connect_error', (error) => {
-        console.error("❌ Error de conexión:", error);
+        console.error("❌ Error de conexión Socket:", error);
     });
 
-    // Envío (Emisor)
-    document.getElementById('chat-form').onsubmit = (e) => {
+    // Envío de mensajes
+    chatForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const input = document.getElementById('mensaje-input');
-        const msg = input.value.trim();
-        if (msg) {
+        const texto = inputMsg.value.trim();
+        
+        if (texto) {
+            console.log("✈️ Enviando a:", CONTACTO_ID);
             socket.emit('enviar_mensaje', {
-                receptor_id: receptorId,
-                mensaje: msg
+                receptor_id: CONTACTO_ID,
+                mensaje: texto
             });
-            input.value = '';
+            inputMsg.value = '';
         }
-    };
+    });
 
-    // Recepción (Receptor/Feedback)
+    // Recepción de mensajes
     socket.on('nuevo_mensaje', (data) => {
-        // Validación de contexto (Seguridad)
-        if (data.emisor_id == receptorId || data.emisor_id == miId) {
+        console.log("📩 Nuevo mensaje recibido:", data);
+        // Validar si el mensaje pertenece a este chat abierto
+        if (data.emisor_id == CONTACTO_ID || data.emisor_id == USER_ID) {
             renderizarBurbuja(data);
             scrollToBottom();
         }
     });
 
+    // SRP: Renderizado de UI
     function renderizarBurbuja(data) {
-        const esMio = data.emisor_id == miId;
+        const esMio = data.emisor_id == USER_ID;
         const div = document.createElement('div');
         div.className = `d-flex ${esMio ? 'justify-content-end' : 'justify-content-start'} mb-3`;
+        
         div.innerHTML = `
             <div class="p-2 px-3 shadow-sm" style="max-width: 80%; border-radius: 15px; 
                  background-color: ${esMio ? '#dcf8c6' : '#ffffff'};
@@ -91,9 +103,11 @@
                 <p class="mb-0">${data.mensaje}</p>
                 <small class="text-muted d-block text-end" style="font-size: 10px;">${data.fecha || 'Ahora'}</small>
             </div>`;
+        
         chatBox.appendChild(div);
     }
 
-    scrollToBottom();
+    // Inicio
+    window.onload = scrollToBottom;
 </script>
 {% endblock %}
