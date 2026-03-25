@@ -510,7 +510,7 @@ def admin_panel():
 @app.route('/admin/agregar_categoria', methods=['POST'])
 @login_required
 def agregar_categoria():
-    if session.get('user_rol') == 'admin':
+    if session.get('rol') == 'admin':
         nombre = request.form['nombre_categoria']
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -525,7 +525,7 @@ def agregar_categoria():
 @app.route('/admin/eliminar_categoria/<int:id>')
 @login_required
 def eliminar_categoria(id):
-    if session.get('user_rol') == 'admin':
+    if session.get('rol') == 'admin':
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM maestro_categorias WHERE id = %s", (id,))
@@ -539,7 +539,7 @@ def eliminar_categoria(id):
 @app.route('/admin/cambiar_estado/<int:usuario_id>/<nuevo_estado>')
 @login_required
 def cambiar_estado(usuario_id, nuevo_estado):
-    if session.get('user_rol') != 'admin':
+    if session.get('rol') != 'admin':
         return redirect('/')
     
     conn = get_db_connection()
@@ -557,7 +557,7 @@ def cambiar_estado(usuario_id, nuevo_estado):
 @app.route('/admin/agregar_barrio', methods=['POST'])
 @login_required
 def agregar_barrio():
-    if session.get('user_rol') == 'admin':
+    if session.get('rol') == 'admin':
         nombre = request.form.get('nombre_barrio')
         if nombre:
             conn = get_db_connection()
@@ -579,7 +579,7 @@ def agregar_barrio():
 @app.route('/admin/eliminar_barrio/<int:id>')
 @login_required
 def eliminar_barrio(id):
-    if session.get('user_rol') == 'admin':
+    if session.get('rol') == 'admin':
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
