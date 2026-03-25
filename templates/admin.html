@@ -147,10 +147,17 @@
                         </form>
                         <ul class="list-group list-group-flush">
                             {% for cat in categorias %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ cat.nombre }}
-                                <a href="/admin/eliminar_categoria/{{ cat.id }}" class="text-danger small" onclick="return confirm('¿Eliminar?')">Eliminar</a>
-                            </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ cat.nombre }}
+                                    
+                                    <form action="/admin/eliminar_categoria/{{ cat.id }}" method="POST" class="m-0 p-0" onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta categoría?');">
+                                        <button type="submit" class="btn btn-link text-danger p-0 m-0 text-decoration-none small">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </li>
+                            {% else %}
+                                <li class="list-group-item text-muted text-center">No hay categorías registradas.</li>
                             {% endfor %}
                         </ul>
                     </div>

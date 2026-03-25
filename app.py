@@ -562,18 +562,28 @@ def agregar_categoria():
         flash("Categoría añadida con éxito")
     return redirect('/admin')
 
-# Nueva ruta para eliminar categorías
-@app.route('/admin/eliminar_categoria/<int:id>')
+# --- NUEVA RUTA PARA ELIMINAR CATEGORÍAS (SEGURA) ---
+@app.route('/admin/eliminar_categoria/<int:id>', methods=['POST'])
 @login_required
 def eliminar_categoria(id):
     if session.get('rol') == 'admin':
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM maestro_categorias WHERE id = %s", (id,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        flash("Categoría eliminada.")
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM maestro_categorias WHERE id = %s", (id,))
+            conn.commit()
+            flash("Categoría eliminada con éxito.", "success")
+            
+        except Exception as e:
+            # Si hay un error de Foreign Key, caerá aquí en lugar de dar Error 500
+            conn.rollback() 
+            print(f"Error al eliminar categoría: {e}")
+            flash("No se puede eliminar esta categoría porque hay MYPES que la están usando.", "danger")
+            
+        finally:
+            cursor.close()
+            conn.close()
+            
     return redirect('/admin')
 
 # Nueva ruta para cambiar estado
