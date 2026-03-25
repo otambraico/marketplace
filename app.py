@@ -162,86 +162,62 @@ def bandeja_entrada():
     conn.close()
     return render_template('bandeja.html', conversaciones=conversaciones)
 
+# ==========================================
+# LÓGICA DE LOGIN (El Director de Tráfico)
+# ==========================================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # 1. Redirección automática si el usuario ya tiene sesión activa
+    # 1. Si ya tiene sesión, redirigir a su panel
     if 'user_id' in session:
         rol = session.get('rol')
         if rol == 'admin':
-            return redirect('/admin') # O la ruta que uses para el admin
+            return redirect('/admin')
         elif rol == 'mype':
             return redirect('/dashboard_mype')
-        else:
+        elif rol == 'cliente':
             return redirect('/perfil_cliente')
+        else:
+            return redirect('/')
 
-    # 2. Procesamiento del Formulario
+    # 2. Procesar el formulario
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
 
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Usar RealDictCursor evita errores de índices
 
-        # Buscar usuario
         cursor.execute("SELECT id, nombre, rol, password FROM usuarios WHERE email = %s", (email,))
         user = cursor.fetchone()
 
-        if user:
-            # Extraer datos soportando tanto diccionario como tupla
-            db_password = user['password'] if isinstance(user, dict) else user[3]
-            db_rol = user['rol'] if isinstance(user, dict) else user[2]
-            db_id = user['id'] if isinstance(user, dict) else user[0]
-            db_nombre = user['nombre'] if isinstance(user, dict) else user[1]
+        if user and check_password_hash(user['password'], password):
+            
+            # 3. Guardar Sesión Global
+            session['user_id'] = user['id']
+            session['nombre'] = user['nombre']
+            session['rol'] = user['rol'] # OJO: La clave es 'rol'
 
-            # 3. VERIFICACIÓN DE SEGURIDAD (Hash vs Texto Plano)
-            if check_password_hash(db_password, password):
+            # 4. Enrutamiento Específico
+            if user['rol'] == 'admin':
+                cursor.close()
+                conn.close()
+                return redirect('/admin') 
+
+            elif user['rol'] == 'mype':
+                cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (user['id'],))
+                perfil = cursor.fetchone()
+                session['mype_id'] = perfil['id'] if perfil else None
                 
-                # Configurar sesión base común a todos los roles
-                session['user_id'] = db_id
-                session['nombre'] = db_nombre
-                session['rol'] = db_rol
+                cursor.close()
+                conn.close()
+                return redirect('/dashboard_mype')
 
-                # 4. ENRUTAMIENTO POR ROL
-                if db_rol == 'admin':
-                    print(f"✅ ÉXITO - Admin logueado. ID: {db_id}")
-                    cursor.close()
-                    conn.close()
-                    # Redirige al panel del administrador
-                    return redirect('/admin') 
-
-                elif db_rol == 'mype':
-                    # Carga especial de seguridad para la MYPE
-                    cursor.execute("SELECT id FROM perfiles_mype WHERE usuario_id = %s", (db_id,))
-                    perfil = cursor.fetchone()
-                    
-                    if perfil:
-                        session['mype_id'] = perfil['id'] if isinstance(perfil, dict) else perfil[0]
-                    else:
-                        session['mype_id'] = None 
-                    
-                    print(f"✅ ÉXITO - MYPE logueada. ID: {db_id}, MYPE ID: {session['mype_id']}")
-                    cursor.close()
-                    conn.close()
-                    return redirect('/dashboard_mype')
-
-                elif db_rol == 'cliente':
-                    print(f"✅ ÉXITO - Cliente logueado. ID: {db_id}")
-                    cursor.close()
-                    conn.close()
-                    # Redirige al inicio (mapa/marketplace)
-                    return redirect('/perfil_cliente')
-                
-                else:
-                    # Fallback por si hay un rol mal escrito en la BD
-                    cursor.close()
-                    conn.close()
-                    return redirect('/')
-
-            else:
-                print("❌ ERROR - Contraseña incorrecta (Fallo en check_password_hash).")
-                flash("Correo o contraseña incorrectos.", "danger")
+            elif user['rol'] == 'cliente':
+                cursor.close()
+                conn.close()
+                return redirect('/perfil_cliente')
+            
         else:
-            print(f"❌ ERROR - Usuario no encontrado para el correo: {email}")
             flash("Correo o contraseña incorrectos.", "danger")
             
         cursor.close()
@@ -475,14 +451,16 @@ def editar_perfil_mype():
     conn.close()
     return render_template('editar_mype.html', mype=mype)
 
-#Lógica del Admin
+# ==========================================
+# LÓGICA DEL ADMIN (Corregida)
+# ==========================================
 @app.route('/admin')
 @login_required
 def admin_panel():
     # Seguridad: Solo el admin entra aquí
-    if session.get('user_rol') != 'admin': 
+    if session.get('rol') != 'admin': 
+        flash("Acceso restringido. Área solo para administradores.", "danger")
         return redirect('/')
-    # flash("Acceso restringido.")
             
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -513,11 +491,7 @@ def admin_panel():
     
     cursor.execute("SELECT count(*) as total FROM productos")
     total_productos = cursor.fetchone()['total']
-
-    # Usuarios registrados
-    # cursor.execute("SELECT id, nombre, email, rol, estado FROM usuarios")
-    # usuarios = cursor.fetchall()
-    # Categorías actuales
+   
     cursor.execute("SELECT * FROM maestro_categorias")
     categorias = cursor.fetchall()
      
@@ -532,6 +506,7 @@ def admin_panel():
                            barrios=barrios
                            )
 
+# Nueva ruta para agregar categorías
 @app.route('/admin/agregar_categoria', methods=['POST'])
 @login_required
 def agregar_categoria():
@@ -560,6 +535,7 @@ def eliminar_categoria(id):
         flash("Categoría eliminada.")
     return redirect('/admin')
 
+# Nueva ruta para cambiar estado
 @app.route('/admin/cambiar_estado/<int:usuario_id>/<nuevo_estado>')
 @login_required
 def cambiar_estado(usuario_id, nuevo_estado):
@@ -598,6 +574,8 @@ def agregar_barrio():
                 conn.close()
     return redirect('/admin')
 
+# --- GESTIÓN DE BARRIOS EN ADMIN ---
+
 @app.route('/admin/eliminar_barrio/<int:id>')
 @login_required
 def eliminar_barrio(id):
@@ -625,8 +603,41 @@ def eliminar_barrio(id):
             conn.close()
     return redirect('/admin')
 
-#Chat
+# ==========================================
+# NUEVO: LÓGICA DEL PERFIL CLIENTE
+# ==========================================
+@app.route('/perfil_cliente')
+@login_required
+def perfil_cliente():
+    if session.get('rol') != 'cliente':
+        return redirect('/')
+        
+    user_id = session.get('user_id')
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    # 1. Obtener datos del cliente y su barrio
+    cursor.execute('''
+        SELECT u.nombre, u.email, u.fecha_registro, b.nombre as barrio_nombre 
+        FROM usuarios u 
+        LEFT JOIN maestro_barrios b ON u.barrio_id = b.id 
+        WHERE u.id = %s
+    ''', (user_id,))
+    cliente = cursor.fetchone()
+    
+    # 2. Contar mensajes sin leer (Para que el cliente sepa si la MYPE le respondió)
+    cursor.execute("SELECT COUNT(*) as total FROM mensajes WHERE receptor_id = %s AND leido = FALSE", (user_id,))
+    res_pendientes = cursor.fetchone()
+    mensajes_pendientes = res_pendientes['total'] if res_pendientes else 0
+    
+    cursor.close()
+    conn.close()
+    
+    return render_template('perfil_cliente.html', cliente=cliente, mensajes_pendientes=mensajes_pendientes)
 
+# ==========================================
+#Logica del Chat
+# ==========================================
 @app.route('/chat/<int:receptor_id>')
 @login_required
 def chat_personal(receptor_id):
