@@ -30,7 +30,35 @@ def get_db_connection():
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1) # [cite: 16]
     return psycopg2.connect(url, cursor_factory=RealDictCursor) # [cite: 1, 16]
-    
+
+# ==========================================
+# PROCESADOR DE CONTEXTO GLOBAL (Notificaciones)
+# ==========================================
+@app.context_processor
+def inject_notificaciones():
+    pendientes = 0
+    # Solo buscamos si hay un usuario logueado
+    if 'user_id' in session:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Contamos los mensajes no leídos donde este usuario es el receptor
+            cursor.execute(
+                "SELECT COUNT(*) as total FROM mensajes WHERE receptor_id = %s AND leido = FALSE",
+                (session['user_id'],)
+            )
+            res = cursor.fetchone()
+            pendientes = res['total'] if res else 0
+            
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error cargando notificaciones globales: {e}")
+            
+    # Devuelve un diccionario que estará disponible en TODOS los HTML
+    return dict(mensajes_pendientes_global=pendientes)
+
 # --- 2. RUTA DE EMERGENCIA (Asegúrate de que esté después de get_db_connection) ---
 @app.route('/fix_admin')
 def fix_admin():
