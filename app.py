@@ -424,28 +424,69 @@ def eliminar_producto(producto_id):
         
     return redirect('/dashboard_mype')
 
-# --- FUNCIONALIDAD: AJUSTES (PERFIL MYPE) ---
+# --- FUNCIONALIDAD: EDITAR PRODUCTO ---
+@app.route('/productos/editar/<int:producto_id>', methods=['GET', 'POST'])
+@login_required
+def editar_producto(producto_id):
+    mype_id = session.get('mype_id')
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # 1. Seguridad: Verificar que el producto existe y pertenece a esta MYPE
+    cursor.execute("SELECT * FROM productos WHERE id = %s AND mype_id = %s", (producto_id, mype_id))
+    producto = cursor.fetchone()
+
+    if not producto:
+        cursor.close()
+        conn.close()
+        flash("Producto no encontrado o no tienes permisos para editarlo.", "danger")
+        return redirect('/dashboard_mype')
+
+    # 2. Procesar el formulario de actualización
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        precio = request.form.get('precio')
+        descripcion = request.form.get('descripcion')
+        foto_url = request.form.get('foto_url')
+
+        cursor.execute('''
+            UPDATE productos 
+            SET nombre = %s, precio = %s, descripcion = %s, foto_url = %s
+            WHERE id = %s AND mype_id = %s
+        ''', (nombre, precio, descripcion, foto_url, producto_id, mype_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Producto actualizado correctamente.", "success")
+        return redirect('/dashboard_mype')
+
+    cursor.close()
+    conn.close()
+    return render_template('editar_producto.html', producto=producto)
+
+# --- FUNCIONALIDAD: AJUSTES (PERFIL MYPE) CORREGIDO ---
 @app.route('/perfil_mype/editar', methods=['GET', 'POST'])
 @login_required
 def editar_perfil_mype():
     mype_id = session.get('mype_id')
     conn = get_db_connection()
-    cursor = conn.cursor()
+    # Usamos RealDictCursor para poder acceder por nombre de columna en el HTML
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
 
     if request.method == 'POST':
-        nombre = request.form.get('nombre')
+        nombre_comercial = request.form.get('nombre_comercial')
         descripcion = request.form.get('descripcion')
-        # Aquí puedes añadir rubro, contacto, etc.
         
+        # Corrección: Apuntando a la tabla 'perfiles_mype' y columna 'nombre_comercial'
         cursor.execute('''
-            UPDATE mypes SET nombre = %s, descripcion = %s
+            UPDATE perfiles_mype SET nombre_comercial = %s, descripcion = %s
             WHERE id = %s
-        ''', (nombre, descripcion, mype_id))
+        ''', (nombre_comercial, descripcion, mype_id))
         conn.commit()
-        flash("Perfil actualizado", "success")
+        flash("Perfil actualizado con éxito", "success")
         return redirect('/dashboard_mype')
 
-    cursor.execute("SELECT * FROM mypes WHERE id = %s", (mype_id,))
+    cursor.execute("SELECT * FROM perfiles_mype WHERE id = %s", (mype_id,))
     mype = cursor.fetchone()
     cursor.close()
     conn.close()

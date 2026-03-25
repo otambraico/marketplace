@@ -72,11 +72,11 @@
                         </td>
                         <td class="fw-bold text-primary">S/ {{ "%.2f"|format(p.precio) }}</td>
                         <td class="text-end pe-3">
-                            <div class="btn-group btn-group-sm">
-                                <a href="/productos/editar/{{ p.id }}" class="btn btn-light border">
+                            <div class="d-flex justify-content-end gap-2">
+                                <a href="/productos/editar/{{ p.id }}" class="btn btn-outline-primary btn-sm d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 36px; height: 36px;" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <button type="button" class="btn btn-light border text-danger" data-bs-toggle="modal" data-bs-target="#modalEliminar{{ p.id }}">
+                                <button type="button" class="btn btn-outline-danger btn-sm d-flex align-items-center justify-content-center rounded-circle shadow-sm" data-bs-toggle="modal" data-bs-target="#modalEliminar{{ p.id }}" style="width: 36px; height: 36px;" title="Eliminar">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>

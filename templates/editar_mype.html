@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm p-4">
+                <div class="d-flex align-items-center mb-4">
+                    <a href="/dashboard_mype" class="text-decoration-none text-muted me-3 fs-5"><i class="bi bi-arrow-left"></i></a>
+                    <h4 class="fw-bold mb-0">Ajustes del Negocio</h4>
+                </div>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Nombre Comercial</label>
+                        <input type="text" name="nombre_comercial" class="form-control form-control-lg" value="{{ mype.nombre_comercial or '' }}" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Descripción del Negocio</label>
+                        <textarea name="descripcion" class="form-control" rows="4" placeholder="¿Qué ofrece tu negocio a la comunidad?">{{ mype.descripcion or '' }}</textarea>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
