@@ -157,38 +157,66 @@ def handle_mensaje(data):
         except Exception as e:
             print(f"🔥 Error crítico en DB: {e}")
 
-@app.route('/mensajes')
+@app.route('/bandeja')
 @login_required
-def bandeja_entrada():
+def bandeja():
     user_id = session.get('user_id')
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Query avanzada: Obtiene el último mensaje de cada conversación y cuenta no leídos
-    query = """
-    SELECT DISTINCT ON (sub.contacto_id)
-        sub.contacto_id,
-        u.nombre,
-        sub.contenido,
-        sub.fecha,
-        (SELECT COUNT(*) FROM mensajes WHERE receptor_id = %s AND emisor_id = sub.contacto_id AND leido = FALSE) as pendientes
-    FROM (
-        SELECT 
-            CASE WHEN emisor_id = %s THEN receptor_id ELSE emisor_id END as contacto_id,
-            contenido, fecha
-        FROM mensajes
-        WHERE emisor_id = %s OR receptor_id = %s
-        ORDER BY fecha DESC
-    ) sub
-    JOIN usuarios u ON u.id = sub.contacto_id
-    ORDER BY sub.contacto_id, sub.fecha DESC
-    """
-    cursor.execute(query, (user_id, user_id, user_id, user_id))
-    conversaciones = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-    return render_template('bandeja.html', conversaciones=conversaciones)
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # SQL AVANZADO: Agrupa por conversación y trae el último mensaje
+        query = '''
+            WITH UltimosMensajes AS (
+                SELECT 
+                    CASE 
+                        WHEN emisor_id = %s THEN receptor_id 
+                        ELSE emisor_id 
+                    END AS contacto_id,
+                    MAX(fecha) as ultima_fecha
+                FROM mensajes
+                WHERE emisor_id = %s OR receptor_id = %s
+                GROUP BY 
+                    CASE 
+                        WHEN emisor_id = %s THEN receptor_id 
+                        ELSE emisor_id 
+                    END
+            )
+            SELECT 
+                um.contacto_id,
+                u.nombre as contacto_nombre,
+                u.rol as contacto_rol,
+                pm.nombre_comercial as mype_nombre,
+                m.contenido as ultimo_mensaje,
+                m.fecha as fecha_mensaje,
+                m.leido,
+                m.emisor_id,
+                (SELECT COUNT(*) FROM mensajes 
+                 WHERE emisor_id = um.contacto_id AND receptor_id = %s AND leido = FALSE) as no_leidos
+            FROM UltimosMensajes um
+            JOIN mensajes m ON (
+                (m.emisor_id = %s AND m.receptor_id = um.contacto_id) OR 
+                (m.emisor_id = um.contacto_id AND m.receptor_id = %s)
+            ) AND m.fecha = um.ultima_fecha
+            JOIN usuarios u ON u.id = um.contacto_id
+            LEFT JOIN perfiles_mype pm ON pm.usuario_id = u.id
+            ORDER BY m.fecha DESC;
+        '''
+        
+        # Pasamos el user_id las 7 veces que lo requiere la consulta
+        cursor.execute(query, (user_id, user_id, user_id, user_id, user_id, user_id, user_id))
+        conversaciones = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        return render_template('bandeja.html', conversaciones=conversaciones)
+        
+    except Exception as e:
+        print(f"Error cargando la bandeja: {e}")
+        flash("Hubo un error al cargar tus mensajes.", "danger")
+        return redirect('/')
 
 # ==========================================
 # LÓGICA DE LOGIN (El Director de Tráfico)

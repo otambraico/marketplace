@@ -1,34 +1,69 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4" style="max-width: 600px;">
-    <h3 class="mb-4">💬 Mis Conversaciones</h3>
-    
-    <div class="list-group shadow-sm">
-        {% for c in conversaciones %}
-        <a href="/chat/{{ c.contacto_id }}" class="list-group-item list-group-item-action d-flex align-items-center p-3">
-            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-weight: bold;">
-                {{ c.nombre[0] | upper }}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8">
+            
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h3 class="fw-bold mb-0"><i class="bi bi-chat-dots text-primary me-2"></i> Mis Mensajes</h3>
             </div>
-            <div class="flex-grow-1">
-                <div class="d-flex justify-content-between">
-                    <h6 class="mb-0 fw-bold">{{ c.nombre }}</h6>
-                    <small class="text-muted">{{ c.fecha.strftime('%H:%M') if c.fecha else '' }}</small>
+
+            <div class="card border-0 shadow-sm overflow-hidden">
+                <div class="list-group list-group-flush">
+                    {% for conv in conversaciones %}
+                        <a href="/chat/{{ conv.contacto_id }}" class="list-group-item list-group-item-action p-3 {% if conv.no_leidos > 0 %}bg-light{% endif %}">
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    
+                                    <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-3 shadow-sm" style="width: 50px; height: 50px; font-size: 1.2rem;">
+                                        {{ (conv.mype_nombre if conv.contacto_rol == 'mype' and conv.mype_nombre else conv.contacto_nombre)[0] | upper }}
+                                    </div>
+                                    
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark">
+                                            {% if conv.contacto_rol == 'mype' and conv.mype_nombre %}
+                                                {{ conv.mype_nombre }} <span class="badge bg-soft-primary text-primary ms-1" style="font-size: 0.65rem;">Tienda</span>
+                                            {% else %}
+                                                {{ conv.contacto_nombre }}
+                                            {% endif %}
+                                        </h6>
+                                        <p class="mb-0 text-truncate text-muted" style="max-width: 250px; font-size: 0.9rem;">
+                                            {% if conv.emisor_id == session.user_id %}
+                                                <i class="bi bi-check2-all text-primary"></i> 
+                                            {% endif %}
+                                            <span class="{% if conv.no_leidos > 0 %}fw-bold text-dark{% endif %}">
+                                                {{ conv.ultimo_mensaje }}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-end">
+                                    <small class="text-muted d-block mb-1" style="font-size: 0.75rem;">
+                                        {{ conv.fecha_mensaje.strftime('%d %b, %H:%M') if conv.fecha_mensaje else '' }}
+                                    </small>
+                                    {% if conv.no_leidos > 0 %}
+                                        <span class="badge rounded-pill bg-danger shadow-sm">{{ conv.no_leidos }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </a>
+                    {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
+                            <h5 class="fw-bold">No tienes mensajes</h5>
+                            <p>Tus conversaciones aparecerán aquí.</p>
+                        </div>
+                    {% endfor %}
                 </div>
-                <p class="mb-0 text-muted small text-truncate" style="max-width: 250px;">
-                    {{ c.contenido }}
-                </p>
             </div>
-            {% if c.pendientes > 0 %}
-                <span class="badge rounded-pill bg-success ms-2">{{ c.pendientes }}</span>
-            {% endif %}
-        </a>
-        {% else %}
-            <div class="text-center p-5 bg-white rounded shadow-sm">
-                <p class="text-muted">Aún no tienes mensajes.</p>
-                <a href="/" class="btn btn-primary btn-sm">Explorar Negocios</a>
-            </div>
-        {% endfor %}
+
+        </div>
     </div>
 </div>
+
+<style>
+    .bg-soft-primary { background-color: rgba(13, 110, 253, 0.1); }
+</style>
 {% endblock %}
