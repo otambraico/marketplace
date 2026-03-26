@@ -100,10 +100,17 @@
     // Recepción de mensajes
     socket.on('nuevo_mensaje', (data) => {
         console.log("📩 Nuevo mensaje recibido:", data);
+        
         // Validar si el mensaje pertenece a este chat abierto
         if (data.emisor_id == CONTACTO_ID || data.emisor_id == USER_ID) {
             renderizarBurbuja(data);
             scrollToBottom();
+            
+            // NUEVO: Si el mensaje que acaba de llegar es de la otra persona, 
+            // le digo al servidor "¡Ya lo vi!" para que borre el globito rojo.
+            if (data.emisor_id == CONTACTO_ID) {
+                socket.emit('marcar_leido', { emisor_id: CONTACTO_ID });
+            }
         }
     });
 

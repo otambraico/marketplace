@@ -157,6 +157,28 @@ def handle_mensaje(data):
         except Exception as e:
             print(f"🔥 Error crítico en DB: {e}")
 
+@socketio.on('marcar_leido')
+def handle_marcar_leido(data):
+    user_id = session.get('user_id') # Yo, el que está leyendo
+    emisor_id = data.get('emisor_id') # El que me mandó el mensaje
+    
+    if user_id and emisor_id:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE mensajes SET leido = TRUE WHERE emisor_id = %s AND receptor_id = %s AND leido = FALSE",
+                (emisor_id, user_id)
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print(f"👀 Mensajes de {emisor_id} marcados como leídos por {user_id} en tiempo real.")
+        except Exception as e:
+            print(f"❌ Error DB al marcar leído en Socket: {e}")
+
+#********************************************************************************************
+
 @app.route('/bandeja')
 @login_required
 def bandeja():
@@ -750,10 +772,25 @@ def perfil_cliente():
 def chat_personal(receptor_id):
     user_id = session.get('user_id') # Esta es tu variable local
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
        
-    # CORRECCIÓN 1: Incluir 'id' en el SELECT para que el JS lo reciba
-    cursor.execute("SELECT id, nombre FROM usuarios WHERE id = %s", (receptor_id,))
+    # ==========================================
+    # 1. ACTUALIZAR MENSAJES A "LEÍDO"
+    # Todo lo que la otra persona (receptor_id) me envió a mí (user_id), ya lo vi.
+    # ==========================================
+    try:
+        cursor.execute('''
+            UPDATE mensajes 
+            SET leido = TRUE 
+            WHERE emisor_id = %s AND receptor_id = %s AND leido = FALSE
+        ''', (receptor_id, user_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Error al marcar como leído: {e}")
+        conn.rollback()
+
+    # 2. Cargar datos del contacto (Asegúrate de incluir el 'id' como corregimos antes)
+    cursor.execute("SELECT id, nombre, rol FROM usuarios WHERE id = %s", (receptor_id,))
     contacto = cursor.fetchone()
     
     if not contacto:
@@ -762,7 +799,7 @@ def chat_personal(receptor_id):
         flash("El usuario no existe.", "warning")
         return redirect('/')
 
-    # CORRECCIÓN 2: Usar 'user_id' en lugar de 'emisor_id' para coincidir con la sesión
+    # 3. Cargar historial de mensajes
     cursor.execute('''
         SELECT * FROM mensajes 
         WHERE (emisor_id = %s AND receptor_id = %s) 
@@ -774,8 +811,9 @@ def chat_personal(receptor_id):
     cursor.close()
     conn.close()
 
-    # Ahora 'contacto' contiene {'id': X, 'nombre': '...'} y el JS funcionará
     return render_template('chat.html', contacto=contacto, historial=historial)
+
+
 
 if __name__ == '__main__':
     # 1. Importamos la función de inicialización
