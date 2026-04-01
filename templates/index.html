@@ -118,7 +118,7 @@
                         // Construimos la lista de productos si existe
                         let listaProd = mype.productos && mype.productos.length > 0 
                             ? mype.productos.map(p => `<li class="mb-1 text-truncate">${p.nombre} - <b class="text-success">S/${p.precio}</b></li>`).join('')
-                            : "<li class="text-muted">Sin ofertas</li>";
+                            : '<li class="text-muted">Sin ofertas</li>';
                         
                         // Agregamos la distancia si la API la devuelve
                         let etiquetaDistancia = mype.distancia_km 
