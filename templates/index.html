@@ -15,76 +15,131 @@
             height: calc(100vh - 140px); /* Ajuste considerando el header y navbar */
             width: 100%;
             display: block;
+            z-index: 1; /* Evita que el mapa tape los menús desplegables */
         }
         @media (max-width: 768px) {
             #map { height: calc(100vh - 200px); }
         }
-        .info-header { padding: 15px; background: white; text-align: center; border-bottom: 1px solid #ddd; }
+        .info-header { 
+            padding: 15px;
+            background: white; 
+            text-align: center; 
+            border-bottom: 1px solid #ddd; 
+        }
     </style>
 {% endblock %}
 
 {% block content %}
     <div class="main-container-map">
         <div class="info-header shadow-sm">
-            <h1 class="h4 mb-1">📍 Ofertas en tu Barrio</h1>
-            <p class="small text-muted mb-0">Descubre negocios cerca de ti.</p>
+            <h1 class="h4 mb-1"><i class="bi bi-geo-alt-fill text-danger"></i> Ofertas en tu Barrio</h1>
+            <p class="small text-muted mb-0" id="estado-ubicacion">Buscando tu ubicación...</p>
         </div>
 
         <div id="map"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-   
+    
     <script>
         var map; // Definimos la variable globalmente
+        var radioBusquedaKm = 2; // Rango Barrial por defecto
 
         function irAlChat(id) {
             window.location.href = "/chat/" + id;
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Inicialización del mapa
-            map = L.map('map').setView([-12.046374, -77.042793], 13); // Lima por defecto
+            // Inicialización del mapa en Lima por defecto
+            map = L.map('map').setView([-12.046374, -77.042793], 13); 
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
+                attribution: '© OpenStreetMap',
+                maxZoom: 18
             }).addTo(map);
 
-            // Geolocalización
+            // Geolocalización del Usuario
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    var userLat = position.coords.latitude;
-                    var userLng = position.coords.longitude;
-                    map.setView([userLat, userLng], 15);
-                    L.marker([userLat, userLng]).addTo(map).bindPopup("<b>Estás aquí</b>").openPopup();
-                    cargarMypesCercanas();
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var userLat = position.coords.latitude;
+                        var userLng = position.coords.longitude;
+                        
+                        // Centrar mapa en el usuario
+                        map.setView([userLat, userLng], 15);
+                        
+                        // Marcador del Usuario (Punto Azul)
+                        L.circleMarker([userLat, userLng], {
+                            radius: 8,
+                            fillColor: "#007bff",
+                            color: "#fff",
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(map).bindPopup("<b>Estás aquí</b>").openPopup();
+
+                        // Dibujar el "Radio Barrial" visualmente
+                        L.circle([userLat, userLng], {
+                            radius: radioBusquedaKm * 1000, // En metros
+                            color: '#28a745',
+                            fillColor: '#28a745',
+                            fillOpacity: 0.05,
+                            weight: 1
+                        }).addTo(map);
+
+                        document.getElementById('estado-ubicacion').innerText = `Mostrando tiendas a menos de ${radioBusquedaKm}km`;
+
+                        // Llamar a las tiendas enviando nuestra ubicación
+                        cargarMypesCercanas(userLat, userLng);
+                    }, 
+                    function(error) {
+                        document.getElementById('estado-ubicacion').innerText = "No pudimos acceder a tu ubicación. Mostrando mapa general.";
+                        cargarTodasLasMypes(); // Fallback si el usuario no da permiso
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else {
+                document.getElementById('estado-ubicacion').innerText = "Tu navegador no soporta geolocalización.";
+            }
+
+            // Función para buscar con Filtro Geográfico (Sprint 4)
+            function cargarMypesCercanas(lat, lng) {
+                // Pasamos las coordenadas y el radio a la API
+                fetch(`/api/tiendas_cercanas?lat=${lat}&lng=${lng}&radio=${radioBusquedaKm}`)
+                    .then(response => response.json())
+                    .then(mypes => renderizarMypes(mypes))
+                    .catch(error => console.error("Error cargando tiendas:", error));
+            }
+
+            // Función de renderizado (Tu lógica original mejorada)
+            function renderizarMypes(mypes) {
+                mypes.forEach(mype => {
+                    if(mype.latitud && mype.longitud) {
+                        // Construimos la lista de productos si existe
+                        let listaProd = mype.productos && mype.productos.length > 0 
+                            ? mype.productos.map(p => `<li class="mb-1 text-truncate">${p.nombre} - <b class="text-success">S/${p.precio}</b></li>`).join('')
+                            : "<li class="text-muted">Sin ofertas</li>";
+                        
+                        // Agregamos la distancia si la API la devuelve
+                        let etiquetaDistancia = mype.distancia_km 
+                            ? `<span class="badge bg-warning text-dark mb-2"><i class="bi bi-geo"></i> a ${parseFloat(mype.distancia_km).toFixed(2)} km</span>` 
+                            : '';
+
+                        var marker = L.marker([mype.latitud, mype.longitud]).addTo(map);
+                        
+                        marker.bindPopup(`
+                            <div style="min-width:180px; max-width: 220px;">
+                                <h6 style="margin-bottom:5px; color:#0d6efd; font-weight:bold;">${mype.nombre_comercial}</h6>
+                                ${etiquetaDistancia}
+                                <ul style="font-size:12px; padding-left:15px; margin-bottom: 10px;">${listaProd}</ul>
+                                <button onclick="irAlChat(${mype.id})" class="btn btn-primary btn-sm w-100 fw-bold"><i class="bi bi-chat-dots"></i> Escribir</button>
+                            </div>
+                        `);
+                    }
                 });
             }
 
-            function cargarMypesCercanas() {
-                fetch('/api/mypes')
-                    .then(response => response.json())
-                    .then(mypes => {
-                        mypes.forEach(mype => {
-                            if(mype.latitud && mype.longitud) {
-                                var marker = L.marker([mype.latitud, mype.longitud]).addTo(map);
-                                let listaProd = mype.productos && mype.productos.length > 0 
-                                    ? mype.productos.map(p => `<li>${p.nombre} - <b>S/${p.precio}</b></li>`).join('')
-                                    : "<li>Sin ofertas</li>";
-                                
-                                marker.bindPopup(`
-                                    <div style="min-width:150px;">
-                                        <h3 style="margin:0; font-size:14px; color:#007bff;">${mype.nombre_comercial}</h3>
-                                        <ul style="font-size:12px; padding-left:15px;">${listaProd}</ul>
-                                        <button onclick="irAlChat(${mype.mype_id})" class="btn btn-primary btn-sm w-100">💬 Chat</button>
-                                    </div>
-                                `);
-                            }
-                        });
-                    });
-            }
-
-            // EL FIX: Forzar el tamaño correcto después de un breve delay
+            // EL FIX DE LEAFLET (Tu código original)
             setTimeout(function() {
                 map.invalidateSize();
             }, 400);
