@@ -4,6 +4,9 @@ from datetime import timedelta
 
 # Recién ahora puedes importar el resto
 import os
+import cloudinary
+import cloudinary.uploader
+
 from flask import Flask, render_template, request, redirect, flash, session, jsonify
 from flask_socketio import SocketIO, emit, join_room
 
@@ -24,7 +27,21 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 
+# ==========================================
+# Configuración de Cloudinary (Reemplaza con tus datos del Dashboard)
+# En producción, es ideal que esto esté en variables de entorno (os.environ.get)
+# ==========================================
+
+cloudinary.config( 
+  cloud_name = "dw1y1tkdx", 
+  api_key = "412297355718535", 
+  api_secret = "yM9PBOYpNZmKYzidn9-FKtJKV5g" 
+)
+
+# ==========================================
 # --- 1. DEFINIR LA CONEXIÓN PRIMERO ---
+# ==========================================
+
 def get_db_connection():
     url = os.environ.get('DATABASE_URL')
     if url and url.startswith("postgres://"):
@@ -527,7 +544,10 @@ def dashboard_mype():
                            productos=productos, 
                            mensajes_pendientes=mensajes_pendientes)
 
-# --- FUNCIONALIDAD: NUEVO PRODUCTO ---
+# ======================================================
+# --- FUNCIONALIDAD: NUEVO PRODUCTO (CON CLOUDINARY) ---
+# ======================================================
+
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
 @login_required
 def nuevo_producto():
@@ -535,32 +555,43 @@ def nuevo_producto():
         nombre = request.form.get('nombre')
         precio = request.form.get('precio')
         descripcion = request.form.get('descripcion')
-        foto_url = request.form.get('foto_url') # Alineado a la DB
-        
-        # OJO: Según tu DB, la relación es con perfiles_mype. 
-        # Asegúrate de que session['mype_id'] se guarde en el login.
         mype_id = session.get('mype_id') 
+        
+        # CAMBIO 1: Capturamos el archivo físico, no un texto.
+        foto = request.files.get('foto')
+        foto_url = None
 
         try:
+            # CAMBIO 2: Si hay foto, la enviamos a Cloudinary
+            if foto and foto.filename != '':
+                upload_result = cloudinary.uploader.upload(foto, folder="mibarrio_productos")
+                foto_url = upload_result.get('secure_url') # Extraemos el enlace de la nube
+
+            # Guardamos en PostgreSQL de forma normal
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO productos (mype_id, nombre, descripcion, precio, foto_url)
                 VALUES (%s, %s, %s, %s, %s)
             ''', (mype_id, nombre, descripcion, precio, foto_url))
+            
             conn.commit()
             cursor.close()
             conn.close()
+            
             flash("Producto publicado con éxito", "success")
             return redirect('/dashboard_mype')
+            
         except Exception as e:
-            print(f"Error DB al crear producto: {e}")
-            flash("Error al guardar el producto", "danger")
+            print(f"Error DB o Cloudinary al crear producto: {e}")
+            flash("Error al procesar el producto o la imagen.", "danger")
 
     return render_template('nuevo_producto.html')
 
-
+# ======================================================
 # --- FUNCIONALIDAD: ELIMINAR PRODUCTO ---
+# ======================================================
+
 @app.route('/productos/eliminar/<int:producto_id>', methods=['POST'])
 @login_required
 def eliminar_producto(producto_id):
