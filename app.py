@@ -200,79 +200,67 @@ def handle_marcar_leido(data):
 
 @app.route('/api/tiendas_cercanas')
 def tiendas_cercanas():
-    # 1. Obtener coordenadas del cliente y rango desde la petición HTTP GET
     lat = request.args.get('lat', type=float)
     lng = request.args.get('lng', type=float)
-    radio_km = request.args.get('radio', default=2, type=float) # 2km por defecto (Barrial)
+    radio_km = request.args.get('radio', default=2, type=float)
 
-    # Validar que existan coordenadas
     if not lat or not lng:
-        return jsonify({"error": "Ubicación (lat, lng) requerida"}), 400
+        return jsonify({"error": "Ubicación requerida"}), 400
 
     try:
         conn = get_db_connection()
-        # Usamos RealDictCursor para que el resultado se convierta fácilmente a JSON
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # 2. Consulta SQL PostGIS Avanzada
-        # - Calcula la distancia en kilómetros.
-        # - Agrupa los productos en un JSON (para la lista del mapa).
-        # - Filtra solo las MYPES activas que tengan ubicación registrada.
-        query = '''
+        # Consulta SQL con alias 'prod' para evitar ambigüedades
+        query = """
             SELECT 
                 u.id, 
                 u.latitud, 
                 u.longitud,
                 pm.id as mype_id,
                 pm.nombre_comercial,
-                -- Cálculo de distancia (Haversine) a través de PostGIS (en km)
                 ST_Distance(
                     ST_SetSRID(ST_MakePoint(u.longitud, u.latitud), 4326)::geography,
                     ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography
                 ) / 1000 as distancia_km,
-                -- Empaquetamos los productos en un Array JSON
                 COALESCE(
                     json_agg(
                         json_build_object(
-                            'id', p.id,
-                            'nombre', p.nombre,
-                            'precio', p.precio
-                            'foto_url', p.foto_url
+                            'id', prod.id,
+                            'nombre', prod.nombre,
+                            'precio', prod.precio,
+                            'foto_url', prod.foto_url
                         )
-                    ) FILTER (WHERE p.id IS NOT NULL), '[]'
+                    ) FILTER (WHERE prod.id IS NOT NULL), '[]'
                 ) as productos
             FROM usuarios u
             JOIN perfiles_mype pm ON u.id = pm.usuario_id
-            LEFT JOIN productos p ON pm.id = p.mype_id
+            LEFT JOIN productos prod ON pm.id = prod.mype_id
             WHERE u.rol = 'mype' 
               AND u.estado = 'activo'
               AND u.latitud IS NOT NULL 
               AND u.longitud IS NOT NULL
-              -- Filtro de proximidad usando el radio especificado
               AND ST_DWithin(
                   ST_SetSRID(ST_MakePoint(u.longitud, u.latitud), 4326)::geography,
                   ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
                   %s * 1000
               )
-            -- Agrupamos para poder usar json_agg
             GROUP BY u.id, pm.id
             ORDER BY distancia_km ASC;
-        '''
+        """
         
-        # OJO: PostGIS usa el orden (Longitud, Latitud) para ST_MakePoint
+        # PostGIS usa (Longitud, Latitud) en ST_MakePoint
         cursor.execute(query, (lng, lat, lng, lat, radio_km))
         tiendas = cursor.fetchall()
         
         cursor.close()
         conn.close()
-        
         return jsonify(tiendas)
         
     except Exception as e:
         print(f"❌ Error en motor geográfico: {e}")
-        # Retornamos una lista vacía para no romper el mapa en caso de error SQL
         return jsonify([]), 500
-
+    
 # ==========================================
 #Bandeja del CHAT
 # ==========================================
