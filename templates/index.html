@@ -117,8 +117,20 @@
                     if(mype.latitud && mype.longitud) {
                         // Construimos la lista de productos si existe
                         let listaProd = mype.productos && mype.productos.length > 0 
-                            ? mype.productos.map(p => `<li class="mb-1 text-truncate">${p.nombre} - <b class="text-success">S/${p.precio}</b></li>`).join('')
-                            : '<li class="text-muted">Sin ofertas</li>';
+                            ? mype.productos.map(p => {
+                                // Si no tiene foto, mostramos un ícono gris por defecto
+                                let imagenSrc = p.foto_url ? p.foto_url : 'https://via.placeholder.com/40x40?text=%E2%80%A2';
+                                
+                                return `
+                                <li class="mb-2 d-flex align-items-center">
+                                    <img src="${imagenSrc}" alt="${p.nombre}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; margin-right: 10px; border: 1px solid #eee;">
+                                    <div class="text-truncate" style="line-height: 1.2;">
+                                        <span class="d-block text-dark" style="font-size: 0.85rem;">${p.nombre}</span>
+                                        <b class="text-success" style="font-size: 0.8rem;">S/${p.precio}</b>
+                                    </div>
+                                </li>`;
+                            }).join('')
+                            : `<li class="text-muted small"><i class="bi bi-info-circle"></i> Sin ofertas aún</li>`;
                         
                         // Agregamos la distancia si la API la devuelve
                         let etiquetaDistancia = mype.distancia_km 

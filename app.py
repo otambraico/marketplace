@@ -237,6 +237,7 @@ def tiendas_cercanas():
                             'id', p.id,
                             'nombre', p.nombre,
                             'precio', p.precio
+                            'foto_url', p.foto_url
                         )
                     ) FILTER (WHERE p.id IS NOT NULL), '[]'
                 ) as productos
